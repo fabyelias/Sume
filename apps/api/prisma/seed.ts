@@ -18,36 +18,23 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const MOVIL_LIMPIO = {
+    estado: "activo", km: 0, ultimaRevision: "—",
+    mecanica: { aceite: true, agua: true, frenos: true, chocado: false },
+    electro: { dea: true, ciclador: true },
+    oxigeno: { c: 2, cOk: 2, m: 2, mOk: 2 },
+    bolsos: { via: true, paro: true, maletin: true, trauma: true },
+    dotDia: { para: "—", med: "—", turno: "—" },
+    dotNoche: { para: "—", med: "—", turno: "—" },
+  };
+
+  // Mismos identificadores que MOVILES_FIS en apps/web/src/data/constants.ts
   await prisma.movil.createMany({
-    data: [
-      {
-        id: "538", nombre: "Unidad Avanzada", estado: "activo", km: 0, ultimaRevision: "—",
-        mecanica: { aceite: true, agua: true, frenos: true, chocado: false },
-        electro: { dea: true, ciclador: true },
-        oxigeno: { c: 2, cOk: 2, m: 2, mOk: 2 },
-        bolsos: { via: true, paro: true, maletin: true, trauma: true },
-        dotDia: { para: "—", med: "—", turno: "—" },
-        dotNoche: { para: "—", med: "—", turno: "—" },
-      },
-      {
-        id: "542", nombre: "Unidad Básica", estado: "activo", km: 0, ultimaRevision: "—",
-        mecanica: { aceite: true, agua: true, frenos: true, chocado: false },
-        electro: { dea: true, ciclador: true },
-        oxigeno: { c: 2, cOk: 2, m: 2, mOk: 2 },
-        bolsos: { via: true, paro: true, maletin: true, trauma: true },
-        dotDia: { para: "—", med: "—", turno: "—" },
-        dotNoche: { para: "—", med: "—", turno: "—" },
-      },
-      {
-        id: "551", nombre: "Unidad Avanzada", estado: "activo", km: 0, ultimaRevision: "—",
-        mecanica: { aceite: true, agua: true, frenos: true, chocado: false },
-        electro: { dea: true, ciclador: true },
-        oxigeno: { c: 2, cOk: 2, m: 2, mOk: 2 },
-        bolsos: { via: true, paro: true, maletin: true, trauma: true },
-        dotDia: { para: "—", med: "—", turno: "—" },
-        dotNoche: { para: "—", med: "—", turno: "—" },
-      },
-    ],
+    data: ["538", "537", "531", "533", "532", "535", "Kangoo", "Polo 1", "Polo 2"].map((id) => ({
+      id,
+      nombre: "Unidad",
+      ...MOVIL_LIMPIO,
+    })),
     skipDuplicates: true,
   });
 
