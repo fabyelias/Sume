@@ -53,6 +53,24 @@ model Movil {
   dotNoche       Json
 }
 
+// Reportes en vivo: el paramédico reporta una falla o novedad durante la
+// guardia (mecánica, falta de medicación/insumos, u otro), el Jefe y el
+// Mecánico lo ven al instante, y el Mecánico puede responder y marcarlo
+// en proceso / resuelto.
+model Reporte {
+  id            String   @id @default(cuid())
+  movilId       String
+  categoria     String // "mecanica" | "medicacion" | "otro"
+  texto         String
+  foto          Boolean  @default(false)
+  autor         String
+  estado        String   @default("abierto") // "abierto" | "en_proceso" | "resuelto"
+  respuesta     String?
+  respondidoPor String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 // Estado operativo del día a día (asignaciones, cierres, turnos semanales,
 // guardias médicas, PINes, presencias). Se modela como key/value JSON porque
 // la forma de cada bloque varía y se origina del prototipo (sume:* en

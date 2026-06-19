@@ -1,7 +1,9 @@
 import type {
   Asignaciones,
   Base,
+  CategoriaReporte,
   Cierres,
+  EstadoReporte,
   GuardiasMedicas,
   Medico,
   Movil,
@@ -9,6 +11,7 @@ import type {
   Personal,
   Pines,
   Presencias,
+  Reporte,
   Turnos,
 } from "../types";
 
@@ -89,4 +92,13 @@ export const api = {
 
   getPresencias: () => getJSON<Presencias>("/store/presencia_medicos"),
   setPresencias: (v: Presencias) => putJSON<Presencias>("/store/presencia_medicos", v),
+
+  reportes: (filtro?: { movilId?: string; estado?: EstadoReporte }) => {
+    const qs = new URLSearchParams(filtro as Record<string, string>).toString();
+    return getJSON<Reporte[]>(`/reportes${qs ? `?${qs}` : ""}`);
+  },
+  crearReporte: (r: { movilId: string; categoria: CategoriaReporte; texto: string; foto: boolean; autor: string }) =>
+    postJSON<Reporte>("/reportes", r),
+  responderReporte: (id: string, r: { estado: EstadoReporte; respuesta?: string; respondidoPor?: string }) =>
+    putJSON<Reporte>(`/reportes/${id}`, r),
 };

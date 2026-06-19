@@ -59,3 +59,19 @@ export type Pines = Record<string, string>;
 
 export type Presencia = { confirmado: boolean; hora: string; movil: string };
 export type Presencias = Record<string, Presencia>;
+
+export type CategoriaReporte = "mecanica" | "medicacion" | "otro";
+export type EstadoReporte = "abierto" | "en_proceso" | "resuelto";
+export type Reporte = {
+  id: string;
+  movilId: string;
+  categoria: CategoriaReporte;
+  texto: string;
+  foto: boolean;
+  autor: string;
+  estado: EstadoReporte;
+  respuesta: string | null;
+  respondidoPor: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

@@ -1,15 +1,17 @@
-import { AlertCircle, ArrowLeft, Boxes, CheckCircle2, ChevronDown, Gauge, Pill, Wrench, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, Boxes, CheckCircle2, ChevronDown, Gauge, MessageSquareWarning, Pill, Wrench, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { KpiCard } from "../../components/shared/KpiCard";
 import { SecTitle } from "../../components/shared/SecTitle";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport } from "../../lib/theme";
-import type { Movil } from "../../types";
+import type { Movil, Reporte } from "../../types";
 import { MedEstadoChip } from "./MedEstadoChip";
+import { ReporteCard } from "./ReporteCard";
 import { STOCK_INICIAL_MEC } from "./data";
 
 const TABS = [
   { id: "flota", label: "Estado de flota" },
+  { id: "reportes", label: "Reportes" },
   { id: "stock", label: "Stock / Farmacia" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -45,6 +47,7 @@ function StepperO2({ label, value, total, onChange }: { label: string; value: nu
 
 export function PanelMecanico({ onBack }: { onBack: () => void }) {
   const [moviles, setMoviles] = useState<Movil[]>([]);
+  const [reportes, setReportes] = useState<Reporte[]>([]);
   const [stock, setStock] = useState(STOCK_INICIAL_MEC);
   const [tab, setTab] = useState<Tab>("flota");
   const [expand, setExpand] = useState<string | null>(null);
@@ -52,6 +55,13 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const load = () => api.moviles().then(setMoviles);
+    load();
+    const iv = setInterval(load, 8000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    const load = () => api.reportes().then(setReportes);
     load();
     const iv = setInterval(load, 8000);
     return () => clearInterval(iv);
@@ -71,6 +81,7 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
   };
 
   const totalFallas = moviles.reduce((acc, m) => acc + fallasDe(m), 0);
+  const reportesAbiertos = reportes.filter((r) => r.estado !== "resuelto").length;
   const totalStockBajo = Object.values(stock).flat().filter((i) => i.cantidad < i.minimo).length;
 
   return (
@@ -106,11 +117,14 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KpiCard label="Fallas mecánicas" value={totalFallas} color={R}>
             <Wrench size={18} />
           </KpiCard>
-          <KpiCard label="Móviles en flota" value={moviles.length} color="#D97706">
+          <KpiCard label="Reportes abiertos" value={reportesAbiertos} color="#D97706">
+            <MessageSquareWarning size={18} />
+          </KpiCard>
+          <KpiCard label="Móviles en flota" value={moviles.length} color={A}>
             <Pill size={18} />
           </KpiCard>
           <KpiCard label="Stock bajo mínimo" value={totalStockBajo} color="#DC2626">
@@ -185,6 +199,20 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
                   </div>
                 );
               })}
+            </div>
+          </section>
+        )}
+
+        {tab === "reportes" && (
+          <section>
+            <SecTitle icon={<MessageSquareWarning size={13} />}>Reportes de paramédicos</SecTitle>
+            <div className="space-y-3 mt-3">
+              {reportes.length === 0 && <div className={`${card} p-6 text-center text-sm text-slate-400`}>Sin reportes todavía.</div>}
+              {[...reportes]
+                .sort((a, b) => (a.estado === "resuelto" ? 1 : 0) - (b.estado === "resuelto" ? 1 : 0))
+                .map((r) => (
+                  <ReporteCard key={r.id} reporte={r} onUpdated={(actualizado) => setReportes((prev) => prev.map((x) => (x.id === actualizado.id ? actualizado : x)))} />
+                ))}
             </div>
           </section>
         )}
