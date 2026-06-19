@@ -1,4 +1,4 @@
-import { Calendar, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { Calendar, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Truck, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
 import { HOY, MOVILES_FIS } from "../../data/constants";
@@ -25,6 +25,7 @@ export function JefeAsignacion() {
   const [editCell, setEditCell] = useState<string | null>(null);
   const [cellForm, setCellForm] = useState<{ base: string; movil: string; libre: boolean }>({ base: "", movil: "", libre: false });
   const [savingCell, setSavingCell] = useState(false);
+  const [vistaSemana, setVistaSemana] = useState<"paramedico" | "movil">("paramedico");
 
   useEffect(() => {
     const load = async () => {
@@ -78,6 +79,31 @@ export function JefeAsignacion() {
     await api.setTurnos(nuevo);
     setSavingCell(false);
     setEditCell(null);
+  };
+
+  const borrarCell = async () => {
+    if (!editCell) return;
+    setSavingCell(true);
+    const nuevo = { ...turnos };
+    delete nuevo[editCell];
+    setTurnos(nuevo);
+    await api.setTurnos(nuevo);
+    setSavingCell(false);
+    setEditCell(null);
+  };
+
+  // Mismos datos de "turnos" pero agrupados por móvil en vez de por
+  // paramédico, para ver de un vistazo qué móvil queda sin cubrir cada día.
+  const movilesEnUso = Array.from(
+    new Set([...MOVILES_FIS, ...Object.values(turnos).filter((t): t is Extract<TurnoCelda, { libre: false }> => !t.libre).map((t) => t.movil)]),
+  );
+  const paramedicoPorMovilYDia = (movil: string, d: Date) => {
+    const fecha = fmt(d);
+    for (const paramedico of paramedicos) {
+      const t = turnos[`${fecha}:${paramedico.nombre}`];
+      if (t && !t.libre && t.movil === movil) return { nombre: paramedico.nombre, base: t.base };
+    }
+    return null;
   };
 
   return (
@@ -185,7 +211,25 @@ export function JefeAsignacion() {
       </section>
 
       <section>
-        <SecTitle icon={<Calendar size={13} />}>Planificación semanal</SecTitle>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <SecTitle icon={<Calendar size={13} />}>Planificación semanal</SecTitle>
+          <div className="flex gap-1 rounded-xl border border-slate-200 p-1">
+            <button
+              onClick={() => setVistaSemana("paramedico")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${vistaSemana === "paramedico" ? "text-white" : "text-slate-500"}`}
+              style={vistaSemana === "paramedico" ? { background: A } : {}}
+            >
+              <Users size={13} /> Por paramédico
+            </button>
+            <button
+              onClick={() => setVistaSemana("movil")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${vistaSemana === "movil" ? "text-white" : "text-slate-500"}`}
+              style={vistaSemana === "movil" ? { background: A } : {}}
+            >
+              <Truck size={13} /> Por móvil
+            </button>
+          </div>
+        </div>
         <div className="flex items-center justify-between mt-3 mb-4">
           <button
             onClick={() => {
@@ -211,6 +255,7 @@ export function JefeAsignacion() {
             <ChevronRight size={16} className="text-slate-500" />
           </button>
         </div>
+        {vistaSemana === "paramedico" ? (
         <div className={`${card} overflow-x-auto`}>
           <div className="min-w-[700px]">
             <div className="grid border-b border-slate-100" style={{ gridTemplateColumns: "110px repeat(7,1fr)" }}>
@@ -284,6 +329,11 @@ export function JefeAsignacion() {
                             <button onClick={() => setEditCell(null)} className="flex-1 py-1 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-500">
                               ✕
                             </button>
+                            {t && (
+                              <button onClick={borrarCell} disabled={savingCell} className="flex-1 py-1 rounded-lg border border-rose-200 bg-white text-[10px] font-bold text-rose-500 flex items-center justify-center">
+                                <Trash2 size={11} />
+                              </button>
+                            )}
                             <button
                               onClick={saveCell}
                               disabled={savingCell || (!cellForm.libre && (!cellForm.base || !cellForm.movil))}
@@ -332,6 +382,48 @@ export function JefeAsignacion() {
             ))}
           </div>
         </div>
+        ) : (
+        <div className={`${card} overflow-x-auto`}>
+          <div className="min-w-[700px]">
+            <div className="grid border-b border-slate-100" style={{ gridTemplateColumns: "110px repeat(7,1fr)" }}>
+              <div className="p-2 text-[10px] text-slate-400 uppercase tracking-wide border-r border-slate-100" />
+              {diasSemana.map((d, i) => (
+                <div key={i} className={`p-2 text-center border-r border-slate-100 last:border-r-0 ${esHoy(d) ? "bg-blue-50" : ""}`}>
+                  <p className="text-[10px] text-slate-400 uppercase">{DIAS[d.getDay()]}</p>
+                  <p className={`font-display text-lg leading-tight ${esHoy(d) ? "text-blue-600" : "text-slate-700"}`}>{d.getDate()}</p>
+                </div>
+              ))}
+            </div>
+            {movilesEnUso.map((movil, mi) => (
+              <div key={movil} className={`grid border-b border-slate-100 last:border-b-0 ${mi % 2 === 1 ? "bg-slate-50/40" : ""}`} style={{ gridTemplateColumns: "110px repeat(7,1fr)" }}>
+                <div className="p-2 border-r border-slate-100 flex items-center">
+                  <p className="text-[11px] font-bold leading-tight" style={{ color: R }}>
+                    Móvil {movil}
+                  </p>
+                </div>
+                {diasSemana.map((d, di) => {
+                  const cubierto = paramedicoPorMovilYDia(movil, d);
+                  const hoy = esHoy(d);
+                  return (
+                    <div key={di} className={`p-1.5 border-r border-slate-100 last:border-r-0 ${hoy ? "bg-blue-50/40" : ""}`}>
+                      {cubierto ? (
+                        <div className="rounded-xl p-1.5 text-[10px] leading-tight border" style={{ background: `${A}0D`, borderColor: `${A}30` }}>
+                          <p className="font-bold text-slate-700">{cubierto.nombre}</p>
+                          <p className="text-slate-400">{cubierto.base}</p>
+                        </div>
+                      ) : (
+                        <div className="w-full min-h-[40px] rounded-xl border border-dashed border-rose-200 bg-rose-50/30 flex items-center justify-center">
+                          <span className="text-[9px] font-bold uppercase text-rose-400">Sin cubrir</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+        )}
       </section>
     </div>
   );
