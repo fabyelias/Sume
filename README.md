@@ -52,14 +52,15 @@ Vercel, cada uno apuntando al mismo repo con distinto Root Directory.
 
 ### API → Vercel (Root Directory `apps/api`)
 
-La app de Express se expone como función serverless en `apps/api/api/index.ts`
-(`export default app`, sin `app.listen`), y `apps/api/vercel.json` reescribe
-todas las rutas hacia esa función para que el ruteo interno de Express
-(`/api/health`, `/api/medicos`, `/api/store/:key`...) siga funcionando igual.
+Vercel reconoce automáticamente el preset **"Express.js"** porque `express`
+está en las dependencias. Esa convención exige que `apps/api/src/app.ts`
+tenga el app de Express como **export default** (además del export con
+nombre que usan `src/index.ts` y Render) — Vercel importa ese archivo
+directamente como función serverless, sin pasar por `app.listen()`.
 
 1. New Project → importar `fabyelias/Sume` → **Root Directory: `apps/api`**.
-2. Framework Preset: "Other" (no hace falta build command; Vercel compila la
-   función TypeScript sola). El `postinstall` corre `prisma generate`.
+2. Framework Preset: debería autodetectar **"Express"**. El `postinstall`
+   corre `prisma generate` durante el install.
 3. Variables de entorno → `DATABASE_URL`. **Importante**: para serverless usá
    la cadena de **connection pooling** de Supabase (Project Settings →
    Database → Connection pooling, modo *Transaction*, puerto `6543`), no la
