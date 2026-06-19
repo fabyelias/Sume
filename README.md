@@ -47,18 +47,39 @@ npm run prisma:seed       # carga los datos de catálogo de ejemplo
 
 ## Deploy
 
-**API → Render** (`render.yaml` en la raíz, Root Directory `apps/api`):
-1. New Web Service → conectar el repo de GitHub → Render detecta `render.yaml`.
-2. Cargar la variable de entorno `DATABASE_URL` en el dashboard de Render
-   (no está en el repo, solo en `apps/api/.env` local).
-3. Build command `npm install && npm run build`, start command `npm start`
-   (ya definidos en `render.yaml`). El `postinstall` corre `prisma generate`
-   automáticamente.
+Los dos servicios (API y web) se despliegan como **proyectos separados** en
+Vercel, cada uno apuntando al mismo repo con distinto Root Directory.
 
-**Web → Vercel**, proyecto aparte con Root Directory `apps/web`:
-1. Framework Preset: Vite (autodetectado).
-2. Variable de entorno `VITE_API_URL` = URL pública del servicio de Render
-   (ej. `https://sume-api.onrender.com`, sin `/` al final).
+### API → Vercel (Root Directory `apps/api`)
 
-> No desplegar `apps/api` en Vercel: es un servidor Express tradicional
-> (`app.listen`), no una función serverless.
+La app de Express se expone como función serverless en `apps/api/api/index.ts`
+(`export default app`, sin `app.listen`), y `apps/api/vercel.json` reescribe
+todas las rutas hacia esa función para que el ruteo interno de Express
+(`/api/health`, `/api/medicos`, `/api/store/:key`...) siga funcionando igual.
+
+1. New Project → importar `fabyelias/Sume` → **Root Directory: `apps/api`**.
+2. Framework Preset: "Other" (no hace falta build command; Vercel compila la
+   función TypeScript sola). El `postinstall` corre `prisma generate`.
+3. Variables de entorno → `DATABASE_URL`. **Importante**: para serverless usá
+   la cadena de **connection pooling** de Supabase (Project Settings →
+   Database → Connection pooling, modo *Transaction*, puerto `6543`), no la
+   conexión directa de puerto `5432` — cada invocación es una conexión nueva
+   y la directa se queda sin slots rápido. La de `apps/api/.env` (directa) la
+   seguís usando solo en local, para correr migraciones.
+4. Deploy. Te va a quedar una URL tipo `https://sume-api.vercel.app`.
+
+### Web → Vercel (Root Directory `apps/web`)
+
+1. New Project → mismo repo → **Root Directory: `apps/web`**.
+2. Framework Preset: Vite (autodetectado).
+3. Variable de entorno `VITE_API_URL` = la URL del paso anterior, sin `/`
+   al final (ej. `https://sume-api.vercel.app`).
+4. Deploy.
+
+### Alternativa para la API: Render
+
+También se puede desplegar `apps/api` en Render como servidor tradicional
+(`render.yaml` en la raíz ya está listo: Root Directory `apps/api`, build
+`npm install && npm run build`, start `npm start`, conexión directa de
+Postgres sin pooler). Útil si en algún momento se prefiere no depender del
+modelo serverless.
