@@ -58,6 +58,8 @@ export const api = {
 
   paramedicos: () => getJSON<Paramedico[]>("/paramedicos"),
   crearParamedico: (nombre: string) => postJSON<Paramedico>("/paramedicos", { nombre }),
+  editarParamedico: (nombreActual: string, nombreNuevo: string) =>
+    putJSON<Paramedico>(`/paramedicos/${encodeURIComponent(nombreActual)}`, { nombre: nombreNuevo }),
   borrarParamedico: (nombre: string) => del(`/paramedicos/${encodeURIComponent(nombre)}`),
 
   personal: () => getJSON<Personal[]>("/personal"),

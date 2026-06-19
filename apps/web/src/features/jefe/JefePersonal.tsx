@@ -11,6 +11,8 @@ function SeccionParamedicos() {
   const [paramedicos, setParamedicos] = useState<Paramedico[]>([]);
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [nombreEditado, setNombreEditado] = useState("");
 
   const recargar = () => api.paramedicos().then(setParamedicos);
 
@@ -25,6 +27,16 @@ function SeccionParamedicos() {
     await recargar();
     setGuardando(false);
     setNombreNuevo("");
+  };
+
+  const guardarEdicion = async (nombreActual: string) => {
+    if (!nombreEditado.trim() || nombreEditado.trim() === nombreActual) {
+      setEditando(null);
+      return;
+    }
+    await api.editarParamedico(nombreActual, nombreEditado.trim());
+    await recargar();
+    setEditando(null);
   };
 
   const borrar = async (nombre: string) => {
@@ -53,19 +65,52 @@ function SeccionParamedicos() {
           </button>
         </div>
         {paramedicos.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Todavía no hay paramédicos cargados.</p>}
-        {paramedicos.map(({ nombre }) => (
-          <div key={nombre} className={`${card} p-3 flex items-center justify-between`}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
-                {nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-              </div>
-              <p className="text-sm font-semibold text-slate-800">{nombre}</p>
+        {paramedicos.map(({ nombre }) =>
+          editando === nombre ? (
+            <div key={nombre} className={`${card} p-3 flex gap-2`}>
+              <input
+                value={nombreEditado}
+                onChange={(e) => setNombreEditado(e.target.value)}
+                autoFocus
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+              <button onClick={() => setEditando(null)} className="px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button
+                onClick={() => guardarEdicion(nombre)}
+                disabled={!nombreEditado.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-display uppercase tracking-wider text-white"
+                style={{ background: grad }}
+              >
+                Guardar
+              </button>
             </div>
-            <button onClick={() => borrar(nombre)} className="p-2 rounded-lg border border-slate-200 hover:bg-rose-50">
-              <Trash2 size={14} className="text-rose-400" />
-            </button>
-          </div>
-        ))}
+          ) : (
+            <div key={nombre} className={`${card} p-3 flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
+                  {nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+                <p className="text-sm font-semibold text-slate-800">{nombre}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setEditando(nombre);
+                    setNombreEditado(nombre);
+                  }}
+                  className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                >
+                  <Pencil size={14} className="text-slate-400" />
+                </button>
+                <button onClick={() => borrar(nombre)} className="p-2 rounded-lg border border-slate-200 hover:bg-rose-50">
+                  <Trash2 size={14} className="text-rose-400" />
+                </button>
+              </div>
+            </div>
+          ),
+        )}
       </div>
     </section>
   );

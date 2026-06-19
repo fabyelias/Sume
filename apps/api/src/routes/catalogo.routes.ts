@@ -49,6 +49,13 @@ catalogoRouter.post("/paramedicos", async (req, res) => {
   res.status(201).json(paramedico);
 });
 
+catalogoRouter.put("/paramedicos/:nombre", async (req, res) => {
+  const { nombre } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Falta nombre" });
+  const paramedico = await prisma.paramedico.update({ where: { nombre: req.params.nombre }, data: { nombre } });
+  res.json(paramedico);
+});
+
 catalogoRouter.delete("/paramedicos/:nombre", async (req, res) => {
   await prisma.paramedico.delete({ where: { nombre: req.params.nombre } });
   res.status(204).end();
