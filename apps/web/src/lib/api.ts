@@ -12,14 +12,19 @@ import type {
   Turnos,
 } from "../types";
 
+// En dev, el proxy de Vite reenvía /api al backend local. En producción
+// (Vercel) no hay proxy, así que apunta a la API desplegada en Render vía
+// VITE_API_URL (ver apps/web/.env.example).
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`/api${path}`);
+  const res = await fetch(`${API_BASE}/api${path}`);
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
   return res.json();
 }
 
 async function putJSON<T>(path: string, body: T): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
