@@ -97,7 +97,36 @@ catalogoRouter.delete("/personal/:id", async (req, res) => {
   res.status(204).end();
 });
 
-// Móviles (solo lectura: son fijos)
+// Móviles
+const MOVIL_LIMPIO = {
+  mecanica: { aceite: true, agua: true, frenos: true, chocado: false },
+  electro: { dea: true, ciclador: true },
+  oxigeno: { c: 2, cOk: 2, m: 2, mOk: 2 },
+  bolsos: { via: true, paro: true, maletin: true, trauma: true },
+  dotDia: { para: "—", med: "—", turno: "—" },
+  dotNoche: { para: "—", med: "—", turno: "—" },
+};
+
 catalogoRouter.get("/moviles", async (_req, res) => {
   res.json(await prisma.movil.findMany());
+});
+
+catalogoRouter.post("/moviles", async (req, res) => {
+  const { id, nombre, estado, km } = req.body;
+  if (!id || !nombre) return res.status(400).json({ error: "Falta id o nombre" });
+  const movil = await prisma.movil.create({
+    data: { id, nombre, estado: estado ?? "activo", km: km ?? 0, ultimaRevision: "—", ...MOVIL_LIMPIO },
+  });
+  res.status(201).json(movil);
+});
+
+catalogoRouter.put("/moviles/:id", async (req, res) => {
+  const { nombre, estado, km } = req.body;
+  const movil = await prisma.movil.update({ where: { id: req.params.id }, data: { nombre, estado, km } });
+  res.json(movil);
+});
+
+catalogoRouter.delete("/moviles/:id", async (req, res) => {
+  await prisma.movil.delete({ where: { id: req.params.id } });
+  res.status(204).end();
 });

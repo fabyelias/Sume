@@ -3,6 +3,7 @@ import { useState } from "react";
 import { A, BG, R, fontImport } from "../../lib/theme";
 import { JefeAsignacion } from "./JefeAsignacion";
 import { JefeDireccion } from "./JefeDireccion";
+import { JefeFlota } from "./JefeFlota";
 import { JefeMecanica } from "./JefeMecanica";
 import { JefeMedicos } from "./JefeMedicos";
 import { JefePersonal } from "./JefePersonal";
@@ -11,6 +12,7 @@ const TABS = [
   { id: "direccion", label: "Dirección" },
   { id: "medicos", label: "Médicos" },
   { id: "personal", label: "Personal" },
+  { id: "flota", label: "Flota" },
   { id: "asignacion", label: "Turnos" },
   { id: "mecanica", label: "Mecánica" },
 ] as const;
@@ -61,6 +63,7 @@ export function PanelJefe({ onBack }: { onBack: () => void }) {
         {tab === "direccion" && <JefeDireccion />}
         {tab === "medicos" && <JefeMedicos />}
         {tab === "personal" && <JefePersonal />}
+        {tab === "flota" && <JefeFlota />}
         {tab === "asignacion" && <JefeAsignacion />}
         {tab === "mecanica" && <JefeMecanica />}
       </main>
