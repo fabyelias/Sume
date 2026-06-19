@@ -5,10 +5,10 @@ import { api } from "../../lib/api";
 import { R, card, grad } from "../../lib/theme";
 import type { Movil } from "../../types";
 
-type MovilForm = { id: string; nombre: string; estado: string; km: number };
+type MovilForm = { id: string; nombre: string; estado: Movil["estado"]; km: number };
 const MOVIL_VACIO: MovilForm = { id: "", nombre: "", estado: "activo", km: 0 };
 
-const ESTADOS = [
+const ESTADOS: { id: Movil["estado"]; label: string }[] = [
   { id: "activo", label: "En servicio" },
   { id: "taller", label: "En taller" },
   { id: "inactivo", label: "Inactivo" },
@@ -76,7 +76,7 @@ export function JefeFlota() {
               />
               <select
                 value={nuevo.estado}
-                onChange={(e) => setNuevo((f) => f && { ...f, estado: e.target.value })}
+                onChange={(e) => setNuevo((f) => f && { ...f, estado: e.target.value as Movil["estado"] })}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
               >
                 {ESTADOS.map((e) => (
@@ -157,7 +157,7 @@ export function JefeFlota() {
                     />
                     <select
                       value={editForm.estado}
-                      onChange={(e) => setEditForm((f) => ({ ...f, estado: e.target.value }))}
+                      onChange={(e) => setEditForm((f) => ({ ...f, estado: e.target.value as Movil["estado"] }))}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none"
                     >
                       {ESTADOS.map((e) => (

@@ -1,12 +1,12 @@
-import { AlertCircle, ArrowLeft, Boxes, ChevronDown, Gauge, Pill, Wrench, XCircle, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, ArrowLeft, Boxes, CheckCircle2, ChevronDown, Gauge, Pill, Wrench, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { KpiCard } from "../../components/shared/KpiCard";
 import { SecTitle } from "../../components/shared/SecTitle";
+import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport } from "../../lib/theme";
-import { BitacoraTicket } from "./BitacoraTicket";
-import { MOVILES_MEC, STOCK_INICIAL_MEC } from "./data";
+import type { Movil } from "../../types";
 import { MedEstadoChip } from "./MedEstadoChip";
-import type { ChecklistItemMec } from "./types";
+import { STOCK_INICIAL_MEC } from "./data";
 
 const TABS = [
   { id: "flota", label: "Estado de flota" },
@@ -14,21 +14,63 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
+function CheckToggle({ ok, label, onClick }: { ok: boolean; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${ok ? "border-slate-100 hover:bg-slate-50" : "border-rose-200 bg-rose-50/60 hover:bg-rose-50"}`}>
+      {ok ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> : <XCircle size={15} className="text-rose-500 shrink-0" />}
+      <span className={`text-sm ${ok ? "text-slate-600" : "text-rose-700 font-semibold"}`}>{label}</span>
+    </button>
+  );
+}
+
+function StepperO2({ label, value, total, onChange }: { label: string; value: number; total: number; onChange: (v: number) => void }) {
+  return (
+    <div className={`${card} p-3`}>
+      <p className="text-xs text-slate-500 mb-1.5">{label}</p>
+      <div className="flex items-center justify-between">
+        <button onClick={() => onChange(Math.max(0, value - 1))} className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 font-bold hover:bg-slate-50">
+          −
+        </button>
+        <p className="font-display text-lg text-slate-800">
+          {value}
+          <span className="text-slate-400">/{total}</span>
+        </p>
+        <button onClick={() => onChange(Math.min(total, value + 1))} className="w-7 h-7 rounded-lg border border-slate-200 text-slate-500 font-bold hover:bg-slate-50">
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PanelMecanico({ onBack }: { onBack: () => void }) {
-  const [moviles, setMoviles] = useState(MOVILES_MEC);
+  const [moviles, setMoviles] = useState<Movil[]>([]);
   const [stock, setStock] = useState(STOCK_INICIAL_MEC);
   const [tab, setTab] = useState<Tab>("flota");
-  const [expand, setExpand] = useState<string | null>(MOVILES_MEC[0].id);
-  const [expandStock, setExpandStock] = useState<string | null>(MOVILES_MEC[0].id);
+  const [expand, setExpand] = useState<string | null>(null);
+  const [expandStock, setExpandStock] = useState<string | null>(null);
 
-  const updateItem = (movilId: string, itemId: string, nuevo: ChecklistItemMec) =>
-    setMoviles((prev) => prev.map((m) => (m.id !== movilId ? m : { ...m, items: m.items.map((i) => (i.id === itemId ? { ...i, ...nuevo } : i)) })));
+  useEffect(() => {
+    const load = () => api.moviles().then(setMoviles);
+    load();
+    const iv = setInterval(load, 8000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const actualizarMovil = (id: string, cambios: Partial<Movil>) => {
+    setMoviles((prev) => prev.map((m) => (m.id !== id ? m : { ...m, ...cambios })));
+    api.editarMovil(id, cambios);
+  };
 
   const updateStock = (movilId: string, idx: number, delta: number) =>
-    setStock((prev) => ({ ...prev, [movilId]: prev[movilId].map((it, i) => (i === idx ? { ...it, cantidad: Math.max(0, it.cantidad + delta) } : it)) }));
+    setStock((prev) => ({ ...prev, [movilId]: (prev[movilId] ?? []).map((it, i) => (i === idx ? { ...it, cantidad: Math.max(0, it.cantidad + delta) } : it)) }));
 
-  const totalFallas = moviles.reduce((acc, m) => acc + m.items.filter((i) => !i.ok && i.estado !== "resuelto").length, 0);
-  const totalMed = moviles.flatMap((m) => m.medicacion.filter((x) => x.estado !== "ok")).length;
+  const fallasDe = (m: Movil) => {
+    const checks = [!m.mecanica.chocado, m.mecanica.aceite, m.mecanica.agua, m.mecanica.frenos, m.electro.dea, m.electro.ciclador, m.bolsos.via, m.bolsos.paro, m.bolsos.maletin, m.bolsos.trauma];
+    return checks.filter((ok) => !ok).length + (m.oxigeno.cOk < m.oxigeno.c ? 1 : 0) + (m.oxigeno.mOk < m.oxigeno.m ? 1 : 0);
+  };
+
+  const totalFallas = moviles.reduce((acc, m) => acc + fallasDe(m), 0);
   const totalStockBajo = Object.values(stock).flat().filter((i) => i.cantidad < i.minimo).length;
 
   return (
@@ -68,7 +110,7 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
           <KpiCard label="Fallas mecánicas" value={totalFallas} color={R}>
             <Wrench size={18} />
           </KpiCard>
-          <KpiCard label="Alertas medicación" value={totalMed} color="#D97706">
+          <KpiCard label="Móviles en flota" value={moviles.length} color="#D97706">
             <Pill size={18} />
           </KpiCard>
           <KpiCard label="Stock bajo mínimo" value={totalStockBajo} color="#DC2626">
@@ -80,72 +122,63 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
           <section>
             <SecTitle>Estado de la flota</SecTitle>
             <div className="space-y-3 mt-3">
+              {moviles.length === 0 && <div className={`${card} p-6 text-center text-sm text-slate-400`}>Sin móviles cargados. Agregalos desde el Panel Jefe → Flota.</div>}
               {moviles.map((m) => {
                 const open = expand === m.id;
-                const fallas = m.items.filter((i) => !i.ok);
-                const pendientes = fallas.filter((i) => i.estado !== "resuelto");
-                const hayAlgo = fallas.length > 0;
+                const fallas = fallasDe(m);
                 return (
                   <div key={m.id} className={`${card} overflow-hidden`}>
                     <button onClick={() => setExpand(open ? null : m.id)} className="w-full flex items-center justify-between p-4 text-left">
                       <div className="flex items-center gap-3">
-                        <span className={`inline-flex h-2.5 w-2.5 rounded-full ${pendientes.length > 0 ? "bg-rose-500" : "bg-emerald-500"}`} />
+                        <span className={`inline-flex h-2.5 w-2.5 rounded-full ${fallas > 0 ? "bg-rose-500" : "bg-emerald-500"}`} />
                         <div>
                           <p className="font-display text-xl text-slate-800">
-                            Móvil <span style={{ color: R }}>{m.id}</span>
+                            Móvil <span style={{ color: R }}>{m.id}</span> <span className="text-slate-400 text-base">· {m.nombre}</span>
                           </p>
                           <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                            <Gauge size={12} /> {m.km.toLocaleString("es-AR")} km · {m.para} · {m.turno} · {m.fecha}
+                            <Gauge size={12} /> {m.km.toLocaleString("es-AR")} km · {m.estado === "activo" ? "En servicio" : m.estado === "taller" ? "En taller" : "Inactivo"}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {!m.completo && <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-200">Incompleto</span>}
-                        {pendientes.length > 0 ? (
-                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-rose-50 text-rose-600 border-rose-200">{pendientes.length} a revisar</span>
-                        ) : hayAlgo ? (
-                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200">Resuelto</span>
-                        ) : null}
+                        {fallas > 0 ? (
+                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-rose-50 text-rose-600 border-rose-200">{fallas} a revisar</span>
+                        ) : (
+                          <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200">Todo OK</span>
+                        )}
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
                       </div>
                     </button>
                     {open && (
                       <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-4">
                         <div>
-                          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-[0.2em] font-semibold">Checklist</p>
-                          <div className="space-y-2">
-                            {m.items.map((i) => (
-                              <div key={i.id} className={`rounded-lg border p-3 ${i.ok ? "border-slate-100" : "border-rose-200 bg-rose-50/60"}`}>
-                                <div className="flex items-center gap-2.5">
-                                  {i.ok ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> : <XCircle size={15} className="text-rose-500 shrink-0" />}
-                                  <span className={`text-sm ${i.ok ? "text-slate-600" : "text-rose-700 font-semibold"}`}>{i.label}</span>
-                                </div>
-                                {!i.ok && (
-                                  <div className="mt-2 pl-6">
-                                    <BitacoraTicket ticket={i} onUpdate={(t) => updateItem(m.id, i.id, t)} />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
+                          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-[0.2em] font-semibold">Mecánica</p>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <CheckToggle ok={!m.mecanica.chocado} label="Sin choques" onClick={() => actualizarMovil(m.id, { mecanica: { ...m.mecanica, chocado: !m.mecanica.chocado } })} />
+                            <CheckToggle ok={m.mecanica.aceite} label="Aceite" onClick={() => actualizarMovil(m.id, { mecanica: { ...m.mecanica, aceite: !m.mecanica.aceite } })} />
+                            <CheckToggle ok={m.mecanica.agua} label="Agua" onClick={() => actualizarMovil(m.id, { mecanica: { ...m.mecanica, agua: !m.mecanica.agua } })} />
+                            <CheckToggle ok={m.mecanica.frenos} label="Frenos" onClick={() => actualizarMovil(m.id, { mecanica: { ...m.mecanica, frenos: !m.mecanica.frenos } })} />
                           </div>
                         </div>
                         <div>
-                          <p className="text-[10px] text-slate-400 mb-1.5 uppercase tracking-[0.2em] font-semibold">Medicación</p>
-                          {m.medicacion.length === 0 ? (
-                            <p className="text-sm text-slate-400">Sin alertas.</p>
-                          ) : (
-                            <div className="space-y-1.5">
-                              {m.medicacion.map((med, i) => (
-                                <div key={i} className="flex items-center justify-between text-sm">
-                                  <span className="text-slate-600">{med.nombre}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-xs">{med.vence}</span>
-                                    <MedEstadoChip estado={med.estado} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-[0.2em] font-semibold">Terapia</p>
+                          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+                            <CheckToggle ok={m.electro.dea} label="DEA" onClick={() => actualizarMovil(m.id, { electro: { ...m.electro, dea: !m.electro.dea } })} />
+                            <CheckToggle ok={m.electro.ciclador} label="Ciclador" onClick={() => actualizarMovil(m.id, { electro: { ...m.electro, ciclador: !m.electro.ciclador } })} />
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <StepperO2 label="O₂ tubos centrales" value={m.oxigeno.cOk} total={m.oxigeno.c} onChange={(v) => actualizarMovil(m.id, { oxigeno: { ...m.oxigeno, cOk: v } })} />
+                            <StepperO2 label="O₂ tubos manuales" value={m.oxigeno.mOk} total={m.oxigeno.m} onChange={(v) => actualizarMovil(m.id, { oxigeno: { ...m.oxigeno, mOk: v } })} />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-[0.2em] font-semibold">Bolsos</p>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <CheckToggle ok={m.bolsos.via} label="Bolso de vía" onClick={() => actualizarMovil(m.id, { bolsos: { ...m.bolsos, via: !m.bolsos.via } })} />
+                            <CheckToggle ok={m.bolsos.paro} label="Bolso de paro" onClick={() => actualizarMovil(m.id, { bolsos: { ...m.bolsos, paro: !m.bolsos.paro } })} />
+                            <CheckToggle ok={m.bolsos.maletin} label="Maletín médico" onClick={() => actualizarMovil(m.id, { bolsos: { ...m.bolsos, maletin: !m.bolsos.maletin } })} />
+                            <CheckToggle ok={m.bolsos.trauma} label="Bolso de trauma" onClick={() => actualizarMovil(m.id, { bolsos: { ...m.bolsos, trauma: !m.bolsos.trauma } })} />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -183,6 +216,7 @@ export function PanelMecanico({ onBack }: { onBack: () => void }) {
                     </button>
                     {open && (
                       <div className="px-4 pb-4 pt-1 border-t border-slate-100 space-y-2">
+                        {s.length === 0 && <p className="text-sm text-slate-400 py-2">Sin ítems cargados para este móvil.</p>}
                         {s.map((item, idx) => {
                           const bajo = item.cantidad < item.minimo;
                           return (

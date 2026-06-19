@@ -121,8 +121,11 @@ catalogoRouter.post("/moviles", async (req, res) => {
 });
 
 catalogoRouter.put("/moviles/:id", async (req, res) => {
-  const { id, nombre, estado, km } = req.body;
-  const movil = await prisma.movil.update({ where: { id: req.params.id }, data: { id, nombre, estado, km } });
+  const { id, nombre, estado, km, mecanica, electro, oxigeno, bolsos, dotDia, dotNoche } = req.body;
+  const movil = await prisma.movil.update({
+    where: { id: req.params.id },
+    data: { id, nombre, estado, km, mecanica, electro, oxigeno, bolsos, dotDia, dotNoche },
+  });
   res.json(movil);
 });
 
