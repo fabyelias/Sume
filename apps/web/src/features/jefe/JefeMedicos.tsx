@@ -1,9 +1,11 @@
-import { CheckCircle2, ChevronDown, Clock, Lock, Pencil, Phone, Stethoscope } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Lock, Pencil, Phone, Plus, Stethoscope, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import { HOY, MOVILES_MED } from "../../data/constants";
 import type { EstadoGuardiaMedica, GuardiaMedica, GuardiasMedicas, Medico, Pines } from "../../types";
+
+const MEDICO_VACIO: Omit<Medico, "id"> = { nombre: "", especialidad: "", telefono: "", movilFijo: "", turno: "" };
 
 const ESTADO_MAP: Record<EstadoGuardiaMedica, { label: string; dot: string; cls: string }> = {
   pendiente: { label: "Pendiente", dot: "bg-slate-300", cls: "text-slate-400" },
@@ -24,6 +26,10 @@ export function JefeMedicos() {
   const [editPin, setEditPin] = useState<string | null>(null);
   const [pinForm, setPinForm] = useState({ a: "", b: "" });
   const [pinOK, setPinOK] = useState(false);
+  const [nuevoMedico, setNuevoMedico] = useState<Omit<Medico, "id"> | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  const recargarMedicos = () => api.medicos().then(setMedicos);
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +39,20 @@ export function JefeMedicos() {
     };
     load();
   }, []);
+
+  const crearMedico = async () => {
+    if (!nuevoMedico?.nombre.trim()) return;
+    setGuardando(true);
+    await api.crearMedico(nuevoMedico);
+    await recargarMedicos();
+    setGuardando(false);
+    setNuevoMedico(null);
+  };
+
+  const borrarMedico = async (id: string) => {
+    await api.borrarMedico(id);
+    await recargarMedicos();
+  };
 
   const keyG = (id: string) => `${id}:${HOY}`;
 
@@ -212,6 +232,63 @@ export function JefeMedicos() {
 
   const renderPerfiles = () => (
     <div className="space-y-3">
+      {!nuevoMedico ? (
+        <button
+          onClick={() => setNuevoMedico(MEDICO_VACIO)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500 hover:border-blue-300 hover:text-blue-600 transition-colors"
+        >
+          <Plus size={16} /> Nuevo médico
+        </button>
+      ) : (
+        <div className={`${card} p-4 space-y-3 border-l-4`} style={{ borderLeftColor: A }}>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-semibold">Nuevo médico</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={nuevoMedico.nombre}
+              onChange={(e) => setNuevoMedico((f) => f && { ...f, nombre: e.target.value })}
+              placeholder="Nombre (ej: Dr. Pérez)"
+              className="col-span-2 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={nuevoMedico.especialidad}
+              onChange={(e) => setNuevoMedico((f) => f && { ...f, especialidad: e.target.value })}
+              placeholder="Especialidad"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={nuevoMedico.telefono}
+              onChange={(e) => setNuevoMedico((f) => f && { ...f, telefono: e.target.value })}
+              placeholder="Teléfono"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={nuevoMedico.movilFijo}
+              onChange={(e) => setNuevoMedico((f) => f && { ...f, movilFijo: e.target.value })}
+              placeholder="Móvil fijo"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={nuevoMedico.turno}
+              onChange={(e) => setNuevoMedico((f) => f && { ...f, turno: e.target.value })}
+              placeholder="Turno (ej: 07:00–19:00)"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setNuevoMedico(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button
+              onClick={crearMedico}
+              disabled={!nuevoMedico.nombre.trim() || guardando}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider ${nuevoMedico.nombre.trim() ? "text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
+              style={nuevoMedico.nombre.trim() ? { background: grad } : {}}
+            >
+              {guardando ? "Guardando..." : "Crear médico"}
+            </button>
+          </div>
+        </div>
+      )}
       {medicos.map((med) => {
         const open = expandP === med.id;
         const tienePin = !!pines[med.id];
@@ -348,6 +425,12 @@ export function JefeMedicos() {
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={() => borrarMedico(med.id)}
+                  className="flex items-center gap-2 text-sm text-rose-500 border border-rose-200 rounded-xl px-3 py-2 hover:bg-rose-50 transition-colors"
+                >
+                  <Trash2 size={14} /> Borrar médico
+                </button>
               </div>
             )}
           </div>

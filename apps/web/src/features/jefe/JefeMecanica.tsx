@@ -2,16 +2,17 @@ import { Wrench } from "lucide-react";
 import { SecTitle } from "../../components/shared/SecTitle";
 import { card } from "../../lib/theme";
 
-const INCID = [
-  { movil: "542", item: "Choque paragolpe trasero", prio: "alta", por: "C. Ibarra", hora: "Hoy 06:55", foto: true },
-  { movil: "542", item: "Frenos con ruido", prio: "alta", por: "C. Ibarra", hora: "Hoy 06:57", foto: false },
-  { movil: "538", item: "Ciclador no enciende", prio: "alta", por: "L. Fernández", hora: "Hoy 07:05", foto: true },
-];
+type Incidencia = { movil: string; item: string; prio: "alta" | "media"; por: string; hora: string; foto: boolean };
+
+// Sin reportes todavía: se va a completar con los que carguen los
+// paramédicos/mecánicos durante el uso real.
+const INCID: Incidencia[] = [];
 
 export function JefeMecanica() {
   return (
     <div className="space-y-4">
       <SecTitle icon={<Wrench size={13} />}>Reportes mecánicos</SecTitle>
+      {INCID.length === 0 && <div className={`${card} p-6 text-center text-sm text-slate-400`}>Sin reportes mecánicos pendientes.</div>}
       {INCID.map((i, idx) => (
         <div key={idx} className={`${card} p-4 flex items-center justify-between`}>
           <div className="flex items-center gap-3">

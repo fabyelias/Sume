@@ -5,10 +5,12 @@ import { JefeAsignacion } from "./JefeAsignacion";
 import { JefeDireccion } from "./JefeDireccion";
 import { JefeMecanica } from "./JefeMecanica";
 import { JefeMedicos } from "./JefeMedicos";
+import { JefePersonal } from "./JefePersonal";
 
 const TABS = [
   { id: "direccion", label: "Dirección" },
   { id: "medicos", label: "Médicos" },
+  { id: "personal", label: "Personal" },
   { id: "asignacion", label: "Turnos" },
   { id: "mecanica", label: "Mecánica" },
 ] as const;
@@ -58,6 +60,7 @@ export function PanelJefe({ onBack }: { onBack: () => void }) {
       <main className="max-w-5xl mx-auto px-4 py-8">
         {tab === "direccion" && <JefeDireccion />}
         {tab === "medicos" && <JefeMedicos />}
+        {tab === "personal" && <JefePersonal />}
         {tab === "asignacion" && <JefeAsignacion />}
         {tab === "mecanica" && <JefeMecanica />}
       </main>
