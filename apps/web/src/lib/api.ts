@@ -69,7 +69,7 @@ export const api = {
 
   moviles: () => getJSON<Movil[]>("/moviles"),
   crearMovil: (m: { id: string; nombre: string; estado: string; km: number }) => postJSON<Movil>("/moviles", m),
-  editarMovil: (id: string, m: { nombre: string; estado: string; km: number }) => putJSON<Movil>(`/moviles/${id}`, m),
+  editarMovil: (id: string, m: { id: string; nombre: string; estado: string; km: number }) => putJSON<Movil>(`/moviles/${id}`, m),
   borrarMovil: (id: string) => del(`/moviles/${id}`),
 
   getAsignaciones: () => getJSON<Asignaciones>("/store/asignaciones"),

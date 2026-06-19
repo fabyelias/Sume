@@ -37,7 +37,8 @@ export function JefeFlota() {
   };
 
   const guardarEdicion = async (id: string) => {
-    await api.editarMovil(id, { nombre: editForm.nombre, estado: editForm.estado, km: editForm.km });
+    if (!editForm.id.trim()) return;
+    await api.editarMovil(id, { id: editForm.id.trim(), nombre: editForm.nombre, estado: editForm.estado, km: editForm.km });
     await recargar();
     setEditId(null);
   };
@@ -143,6 +144,12 @@ export function JefeFlota() {
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <input
+                      value={editForm.id}
+                      onChange={(e) => setEditForm((f) => ({ ...f, id: e.target.value }))}
+                      placeholder="Número de móvil"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    <input
                       value={editForm.nombre}
                       onChange={(e) => setEditForm((f) => ({ ...f, nombre: e.target.value }))}
                       placeholder="Nombre"
@@ -171,7 +178,12 @@ export function JefeFlota() {
                     <button onClick={() => setEditId(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
                       Cancelar
                     </button>
-                    <button onClick={() => guardarEdicion(m.id)} className="flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider text-white" style={{ background: grad }}>
+                    <button
+                      onClick={() => guardarEdicion(m.id)}
+                      disabled={!editForm.id.trim()}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider ${editForm.id.trim() ? "text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
+                      style={editForm.id.trim() ? { background: grad } : {}}
+                    >
                       Guardar
                     </button>
                   </div>
