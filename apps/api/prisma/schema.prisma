@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Datos de catálogo (gestionados por el Jefe de Paramédicos)
+
+model Medico {
+  id           String @id
+  nombre       String
+  especialidad String
+  telefono     String
+  movilFijo    String
+  turno        String
+}
+
+model Base {
+  id    String @id
+  label String
+  turno String
+}
+
+model Paramedico {
+  nombre String @id
+}
+
+model Personal {
+  id      Int    @id @default(autoincrement())
+  nombre  String
+  rol     String
+  guardia String
+  estado  String
+  horas   Int
+  faltas  Int
+  tardes  Int
+}
+
+model Movil {
+  id             String @id
+  nombre         String
+  estado         String
+  km             Int
+  ultimaRevision String
+  mecanica       Json
+  electro        Json
+  oxigeno        Json
+  bolsos         Json
+  dotDia         Json
+  dotNoche       Json
+}
+
+// Estado operativo del día a día (asignaciones, cierres, turnos semanales,
+// guardias médicas, PINes, presencias). Se modela como key/value JSON porque
+// la forma de cada bloque varía y se origina del prototipo (sume:* en
+// window.storage); permite avanzar rápido sin migraciones por cada cambio
+// de forma. Si un bloque puntual necesita consultas relacionales más
+// adelante, se "gradúa" a su propia tabla.
+model Store {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
