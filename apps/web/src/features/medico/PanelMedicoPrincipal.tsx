@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { HOY } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport, grad } from "../../lib/theme";
-import type { GuardiaMedica, Medico } from "../../types";
+import type { GuardiaMedica, Medico, Presencia } from "../../types";
 
 export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBack: () => void }) {
   const [guardia, setGuardia] = useState<GuardiaMedica | null>(null);
   const [paramedicoOk, setParamedicoOk] = useState(false);
-  const [presencia, setPresencia] = useState<{ confirmado: boolean; hora: string; movil: string } | null>(null);
+  const [presencia, setPresencia] = useState<Presencia | null>(null);
   const [pinMedico, setPinMedico] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
@@ -38,14 +38,42 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
     return () => clearInterval(iv);
   }, [medico.id]);
 
+  // Hora de ingreso esperada para hoy: la que fijó el Jefe para esta guardia
+  // puntual, o si no se especificó, la del turno fijo del médico
+  // ("07:00–19:00" → "07:00"). Móvil asignado no influye en el horario.
+  const horaEsperada = (): string | null => {
+    if (guardia?.horaIngreso) return guardia.horaIngreso;
+    const match = medico.turno.match(/^(\d{1,2}:\d{2})/);
+    return match ? match[1] : null;
+  };
+
   const confirmarPresencia = async () => {
     if (!pinMedico || pin !== pinMedico) {
       setPinError(true);
       return;
     }
-    const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    const ahora = new Date();
+    const hora = ahora.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
     const movilHoy = guardia?.movilAsig || medico.movilFijo;
-    const datos = { confirmado: true, hora, movil: movilHoy };
+
+    let tarde = false;
+    let minutosTarde = 0;
+    const esperada = horaEsperada();
+    if (esperada) {
+      const [h, m] = esperada.split(":").map(Number);
+      const limite = new Date(ahora);
+      limite.setHours(h, m, 0, 0);
+      const diff = Math.round((ahora.getTime() - limite.getTime()) / 60000);
+      if (diff > 0) {
+        tarde = true;
+        minutosTarde = diff;
+      }
+    }
+
+    // La llegada tarde solo se registra para que la vea el Jefe (panel
+    // Médicos); acá no se le muestra nada distinto al médico ni afecta
+    // el checklist del paramédico, son cosas separadas.
+    const datos: Presencia = { confirmado: true, hora, movil: movilHoy, tarde, minutosTarde };
     setPresencia(datos);
     const todas = await api.getPresencias();
     todas[medico.id] = datos;

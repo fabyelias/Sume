@@ -3,9 +3,16 @@ import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import { HOY, MOVILES_MED } from "../../data/constants";
-import type { EstadoGuardiaMedica, GuardiaMedica, GuardiasMedicas, Medico, Pines } from "../../types";
+import type { EstadoGuardiaMedica, GuardiaMedica, GuardiasMedicas, Medico, Pines, Presencias } from "../../types";
 
 const MEDICO_VACIO: Omit<Medico, "id"> = { nombre: "", especialidad: "", telefono: "", movilFijo: "", turno: "" };
+
+function formatTarde(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
+}
 
 const ESTADO_MAP: Record<EstadoGuardiaMedica, { label: string; dot: string; cls: string }> = {
   pendiente: { label: "Pendiente", dot: "bg-slate-300", cls: "text-slate-400" },
@@ -19,6 +26,7 @@ export function JefeMedicos() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [guardias, setGuardias] = useState<GuardiasMedicas>({});
   const [pines, setPines] = useState<Pines>({});
+  const [presencias, setPresencias] = useState<Presencias>({});
   const [expandG, setExpandG] = useState<string | null>(null);
   const [expandP, setExpandP] = useState<string | null>(null);
   const [editG, setEditG] = useState<string | null>(null);
@@ -36,8 +44,11 @@ export function JefeMedicos() {
       setMedicos(await api.medicos());
       setGuardias(await api.getGuardiasMedicas());
       setPines(await api.getPines());
+      setPresencias(await api.getPresencias());
     };
     load();
+    const iv = setInterval(load, 8000);
+    return () => clearInterval(iv);
   }, []);
 
   const crearMedico = async () => {
@@ -356,6 +367,29 @@ export function JefeMedicos() {
                     <span className="font-bold">Kangoo · Código Verde</span> — Horario variable según disponibilidad del médico.
                   </div>
                 )}
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 mb-2">
+                    <Clock size={14} /> Presencia de hoy
+                  </p>
+                  {(() => {
+                    const pres = presencias[med.id];
+                    if (!pres?.confirmado) {
+                      return <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-400">Todavía no fichó presente.</div>;
+                    }
+                    if (pres.tarde) {
+                      return (
+                        <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                          <span className="font-bold">Llegó tarde</span> — fichó a las {pres.hora}, {formatTarde(pres.minutosTarde ?? 0)} después de lo previsto.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                        <span className="font-bold">A horario</span> — fichó presente a las {pres.hora}.
+                      </div>
+                    );
+                  })()}
+                </div>
                 <div className="border-t border-slate-100 pt-3">
                   <div className="flex items-center justify-between mb-3">
                     <div>

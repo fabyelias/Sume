@@ -57,7 +57,7 @@ export type GuardiasMedicas = Record<string, GuardiaMedica>;
 
 export type Pines = Record<string, string>;
 
-export type Presencia = { confirmado: boolean; hora: string; movil: string };
+export type Presencia = { confirmado: boolean; hora: string; movil: string; tarde?: boolean; minutosTarde?: number };
 export type Presencias = Record<string, Presencia>;
 
 export type CategoriaReporte = "mecanica" | "medicacion" | "otro";
