@@ -142,7 +142,7 @@ export function JefeMedicos() {
                     <button
                       onClick={() => {
                         setEditG(med.id);
-                        setFormG({ ...g, movilAsig: g.movilAsig || med.movilFijo });
+                        setFormG({ ...g, estado: g.estado || "pendiente", movilAsig: g.movilAsig || med.movilFijo });
                       }}
                       className="flex items-center gap-2 text-sm text-slate-500 border border-slate-200 rounded-xl px-3 py-2 hover:bg-slate-50 transition-colors"
                     >

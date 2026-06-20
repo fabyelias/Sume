@@ -78,6 +78,15 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
     const todas = await api.getPresencias();
     todas[medico.id] = datos;
     await api.setPresencias(todas);
+
+    // La guardia pasa de "pendiente" a "presente" para que el Jefe vea el
+    // cambio reflejado también en Panel Jefe → Médicos → Guardias de hoy.
+    const k = `${medico.id}:${HOY}`;
+    const guardiasActuales = await api.getGuardiasMedicas();
+    const nuevaGuardia = { ...guardiasActuales[k], estado: "presente" as const };
+    guardiasActuales[k] = nuevaGuardia;
+    setGuardia(nuevaGuardia);
+    await api.setGuardiasMedicas(guardiasActuales);
   };
 
   const movilHoy = guardia?.movilAsig || medico.movilFijo;
@@ -114,7 +123,14 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-5">
         <div className={`${card} p-5`}>
-          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-semibold mb-3">Tu guardia de hoy</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-semibold">Tu guardia de hoy</p>
+            {presencia?.confirmado ? (
+              <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200">Confirmada</span>
+            ) : (
+              <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200">Guardia pendiente</span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-slate-50 p-3">
               <p className="text-xs text-slate-400 mb-0.5">Móvil</p>
