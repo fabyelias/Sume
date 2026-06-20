@@ -36,13 +36,13 @@ export type Movil = {
   dotNoche: { para: string; med: string; turno: string };
 };
 
-export type Asignacion = { base: string; baseId: string; movil: string; turno: string };
+export type Asignacion = { base: string; baseId: string; movil: string; turno: string; medico?: string };
 export type Asignaciones = Record<string, Asignacion>;
 
 export type Cierre = { firmado: boolean; hora: string; movil: string; base: string; km: string; novedades: number };
 export type Cierres = Record<string, Cierre>;
 
-export type TurnoCelda = { libre: true } | { libre: false; base: string; baseId: string; movil: string; turno: string };
+export type TurnoCelda = { libre: true } | { libre: false; base: string; baseId: string; movil: string; turno: string; medico?: string };
 export type Turnos = Record<string, TurnoCelda>;
 
 export type EstadoGuardiaMedica = "pendiente" | "en_camino" | "presente" | "ausente";

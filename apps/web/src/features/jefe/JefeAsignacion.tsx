@@ -4,7 +4,7 @@ import { SecTitle } from "../../components/shared/SecTitle";
 import { HOY, MOVILES_FIS } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, G, R, card, grad } from "../../lib/theme";
-import type { Asignaciones, Base, Cierres, Paramedico, TurnoCelda, Turnos } from "../../types";
+import type { Asignaciones, Base, Cierres, Medico, Paramedico, TurnoCelda, Turnos } from "../../types";
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -15,15 +15,16 @@ function fmt(d: Date) {
 export function JefeAsignacion() {
   const [paramedicos, setParamedicos] = useState<Paramedico[]>([]);
   const [bases, setBases] = useState<Base[]>([]);
+  const [medicos, setMedicos] = useState<Medico[]>([]);
   const [asig, setAsig] = useState<Asignaciones>({});
   const [cierres, setCierres] = useState<Cierres>({});
   const [editando, setEditando] = useState<string | null>(null);
-  const [form, setForm] = useState({ base: "", movil: "" });
+  const [form, setForm] = useState({ base: "", movil: "", medico: "" });
   const semIni = new Date(2026, 5, 15);
   const [semBase, setSemBase] = useState(semIni);
   const [turnos, setTurnos] = useState<Turnos>({});
   const [editCell, setEditCell] = useState<string | null>(null);
-  const [cellForm, setCellForm] = useState<{ base: string; movil: string; libre: boolean }>({ base: "", movil: "", libre: false });
+  const [cellForm, setCellForm] = useState<{ base: string; movil: string; medico: string; libre: boolean }>({ base: "", movil: "", medico: "", libre: false });
   const [savingCell, setSavingCell] = useState(false);
   const [vistaSemana, setVistaSemana] = useState<"paramedico" | "movil">("paramedico");
 
@@ -36,6 +37,7 @@ export function JefeAsignacion() {
     const loadCatalogo = async () => {
       setParamedicos(await api.paramedicos());
       setBases(await api.bases());
+      setMedicos(await api.medicos());
     };
     loadCatalogo();
     load();
@@ -47,7 +49,7 @@ export function JefeAsignacion() {
     if (!form.base || !form.movil) return;
     const base = bases.find((b) => b.id === form.base);
     if (!base) return;
-    const nuevo = { ...asig, [nombre]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno } };
+    const nuevo = { ...asig, [nombre]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
     setEditando(null);
@@ -73,7 +75,7 @@ export function JefeAsignacion() {
     const base = bases.find((b) => b.id === cellForm.base);
     const valor: TurnoCelda = cellForm.libre
       ? { libre: true }
-      : { libre: false, base: base?.label ?? "", baseId: cellForm.base, movil: cellForm.movil, turno: base?.turno ?? "" };
+      : { libre: false, base: base?.label ?? "", baseId: cellForm.base, movil: cellForm.movil, turno: base?.turno ?? "", medico: cellForm.medico || undefined };
     const nuevo = { ...turnos, [editCell]: valor };
     setTurnos(nuevo);
     await api.setTurnos(nuevo);
@@ -101,7 +103,7 @@ export function JefeAsignacion() {
     const fecha = fmt(d);
     for (const paramedico of paramedicos) {
       const t = turnos[`${fecha}:${paramedico.nombre}`];
-      if (t && !t.libre && t.movil === movil) return { nombre: paramedico.nombre, base: t.base };
+      if (t && !t.libre && t.movil === movil) return { nombre: paramedico.nombre, base: t.base, medico: t.medico };
     }
     return null;
   };
@@ -127,6 +129,12 @@ export function JefeAsignacion() {
                       {a ? (
                         <p className="text-xs text-slate-500">
                           {a.base} · Móvil <span style={{ color: R }} className="font-semibold">{a.movil}</span> · {a.turno}
+                          {a.medico && (
+                            <>
+                              {" · "}
+                              <span style={{ color: A }} className="font-semibold">{a.medico}</span>
+                            </>
+                          )}
                         </p>
                       ) : (
                         <p className="text-xs text-slate-400 italic">Sin asignación</p>
@@ -144,7 +152,7 @@ export function JefeAsignacion() {
                     <button
                       onClick={() => {
                         setEditando(nombre);
-                        setForm({ base: a?.baseId || "", movil: a?.movil || "" });
+                        setForm({ base: a?.baseId || "", movil: a?.movil || "", medico: a?.medico || "" });
                       }}
                       className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50"
                     >
@@ -185,6 +193,28 @@ export function JefeAsignacion() {
                             style={form.movil === m ? { background: R } : {}}
                           >
                             {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Médico (opcional)</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setForm((f) => ({ ...f, medico: "" }))}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${!form.medico ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                          style={!form.medico ? { background: G } : {}}
+                        >
+                          Sin médico
+                        </button>
+                        {medicos.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => setForm((f) => ({ ...f, medico: m.nombre }))}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.medico === m.nombre ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                            style={form.medico === m.nombre ? { background: A } : {}}
+                          >
+                            {m.nombre}
                           </button>
                         ))}
                       </div>
@@ -323,6 +353,18 @@ export function JefeAsignacion() {
                                   </option>
                                 ))}
                               </select>
+                              <select
+                                value={cellForm.medico}
+                                onChange={(e) => setCellForm((f) => ({ ...f, medico: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
+                              >
+                                <option value="">Sin médico</option>
+                                {medicos.map((m) => (
+                                  <option key={m.id} value={m.nombre}>
+                                    {m.nombre}
+                                  </option>
+                                ))}
+                              </select>
                             </>
                           )}
                           <div className="flex gap-1">
@@ -349,7 +391,7 @@ export function JefeAsignacion() {
                           className={`rounded-xl p-1.5 text-[10px] leading-tight cursor-pointer ${t.libre ? "bg-slate-100 border border-slate-200" : "border"}`}
                           style={!t.libre ? { background: `${A}0D`, borderColor: `${A}30` } : {}}
                           onClick={() => {
-                            setCellForm(t.libre ? { base: "", movil: "", libre: true } : { base: t.baseId, movil: t.movil, libre: false });
+                            setCellForm(t.libre ? { base: "", movil: "", medico: "", libre: true } : { base: t.baseId, movil: t.movil, medico: t.medico ?? "", libre: false });
                             setEditCell(k);
                           }}
                         >
@@ -361,13 +403,18 @@ export function JefeAsignacion() {
                               <p style={{ color: R }} className="font-bold">
                                 Móvil {t.movil}
                               </p>
+                              {t.medico && (
+                                <p style={{ color: A }} className="font-semibold truncate">
+                                  {t.medico}
+                                </p>
+                              )}
                             </>
                           )}
                         </div>
                       ) : (
                         <button
                           onClick={() => {
-                            setCellForm({ base: "", movil: "", libre: false });
+                            setCellForm({ base: "", movil: "", medico: "", libre: false });
                             setEditCell(k);
                           }}
                           className="w-full min-h-[48px] rounded-xl border border-dashed border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 transition-colors flex items-center justify-center"
@@ -410,6 +457,11 @@ export function JefeAsignacion() {
                         <div className="rounded-xl p-1.5 text-[10px] leading-tight border" style={{ background: `${A}0D`, borderColor: `${A}30` }}>
                           <p className="font-bold text-slate-700">{cubierto.nombre}</p>
                           <p className="text-slate-400">{cubierto.base}</p>
+                          {cubierto.medico && (
+                            <p style={{ color: R }} className="font-semibold truncate">
+                              {cubierto.medico}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className="w-full min-h-[40px] rounded-xl border border-dashed border-rose-200 bg-rose-50/30 flex items-center justify-center">
