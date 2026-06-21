@@ -2,6 +2,7 @@ import type {
   Asignaciones,
   Base,
   CategoriaReporte,
+  ChecklistsPM,
   Cierres,
   EstadoReporte,
   GuardiasMedicas,
@@ -92,6 +93,9 @@ export const api = {
 
   getPresencias: () => getJSON<Presencias>("/store/presencia_medicos"),
   setPresencias: (v: Presencias) => putJSON<Presencias>("/store/presencia_medicos", v),
+
+  getChecklistsPM: () => getJSON<ChecklistsPM>("/store/checklist_paramedicos"),
+  setChecklistsPM: (v: ChecklistsPM) => putJSON<ChecklistsPM>("/store/checklist_paramedicos", v),
 
   reportes: (filtro?: { movilId?: string; estado?: EstadoReporte }) => {
     const qs = new URLSearchParams(filtro as Record<string, string>).toString();

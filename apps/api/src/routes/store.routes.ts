@@ -12,6 +12,7 @@ const VALID_KEYS = new Set([
   "guardias_medicos",
   "pines_medicos",
   "presencia_medicos",
+  "checklist_paramedicos",
 ]);
 
 storeRouter.get("/:key", async (req, res) => {

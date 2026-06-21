@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
+import { HOY } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import type { Base, CategoriaReporte, Reporte } from "../../types";
@@ -75,7 +76,28 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
   const [pin, setPin] = useState("");
   const [firmado, setFirmado] = useState(false);
   const [horaCierre, setHoraCierre] = useState<string | null>(null);
+  const [cargandoChecklist, setCargandoChecklist] = useState(true);
   const PIN_CORRECTO = "1234";
+  const checklistKey = `${HOY}:${nombreParamedico}`;
+
+  // Si ya se envió el checklist hoy (quedó guardado), se carga bloqueado tal
+  // cual quedó: no se vuelve a pedir, solo se pueden seguir cargando
+  // novedades hasta que se firme el cierre.
+  useEffect(() => {
+    api.getChecklistsPM().then((checklists) => {
+      const rec = checklists[checklistKey];
+      if (rec) {
+        setState({ ok: rec.ok as Record<ItemKey, boolean>, detalle: rec.detalle as Record<ItemKey, DetallePM> });
+        setOxigeno(rec.oxigeno);
+        setKm(rec.km);
+        setEnviado(rec.enviado);
+        setFirmado(rec.firmado);
+        setHoraCierre(rec.horaCierre);
+      }
+      setCargandoChecklist(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!enviado) return;
@@ -132,6 +154,11 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
         api.crearReporte({ movilId: movilFisico, categoria: CATEGORIA_ITEM[k], texto: detalle[k].texto, foto: detalle[k].foto, autor: nombreParamedico }),
       ),
     );
+    // Queda guardado y bloqueado: si vuelve a entrar más tarde durante la
+    // misma guardia, lo encuentra tal cual lo dejó.
+    const checklists = await api.getChecklistsPM();
+    checklists[checklistKey] = { base, movilFisico, ok, detalle, oxigeno, km, enviado: true, firmado: false, horaCierre: null };
+    await api.setChecklistsPM(checklists);
   };
 
   const reportarNovedad = async () => {
@@ -151,7 +178,15 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
     const cierresActuales = await api.getCierres();
     cierresActuales[nombreParamedico] = { firmado: true, hora, movil: movilFisico, base: base.label, km, novedades: reportes.length };
     await api.setCierres(cierresActuales);
+
+    const checklists = await api.getChecklistsPM();
+    checklists[checklistKey] = { base, movilFisico, ok, detalle, oxigeno, km, enviado: true, firmado: true, horaCierre: hora };
+    await api.setChecklistsPM(checklists);
   };
+
+  if (cargandoChecklist) {
+    return <div className={`${card} p-6 text-center text-slate-400 text-sm`}>Cargando checklist...</div>;
+  }
 
   return (
     <div className="space-y-7">
@@ -272,6 +307,7 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
               ))}
             </div>
           )}
+          {!firmado && (
           <div className={`${card} p-4 space-y-2`}>
             <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-semibold">Reportar novedad nueva</p>
             <div className="flex gap-2 flex-wrap">
@@ -314,6 +350,7 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
               <PlusCircle size={16} /> {enviandoNovedad ? "Enviando..." : "Reportar novedad"}
             </button>
           </div>
+          )}
         </section>
       )}
 

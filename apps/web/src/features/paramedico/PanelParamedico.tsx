@@ -1,5 +1,6 @@
 import { ArrowLeft, Asterisk } from "lucide-react";
 import { useEffect, useState } from "react";
+import { HOY } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport } from "../../lib/theme";
 import type { Base, Paramedico } from "../../types";
@@ -12,10 +13,23 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
   const [paramedicos, setParamedicos] = useState<Paramedico[]>([]);
   const [nombre, setNombre] = useState<string | null>(null);
   const [guardia, setGuardia] = useState<Guardia | null>(null);
+  const [buscandoGuardia, setBuscandoGuardia] = useState(false);
 
   useEffect(() => {
     api.paramedicos().then(setParamedicos);
   }, []);
+
+  // Si ya tiene un checklist enviado hoy, salta directo a él en vez de
+  // hacerlo elegir base/móvil de nuevo (eso ya quedó fijo al confirmar).
+  useEffect(() => {
+    if (!nombre) return;
+    setBuscandoGuardia(true);
+    api.getChecklistsPM().then((checklists) => {
+      const rec = checklists[`${HOY}:${nombre}`];
+      if (rec) setGuardia({ base: rec.base, movilFisico: rec.movilFisico });
+      setBuscandoGuardia(false);
+    });
+  }, [nombre]);
 
   if (!nombre) {
     return (
@@ -72,7 +86,9 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
         </div>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-8">
-        {!guardia ? (
+        {buscandoGuardia ? (
+          <div className={`${card} p-6 text-center text-slate-400 text-sm`}>Cargando...</div>
+        ) : !guardia ? (
           <PMSeleccion nombreParamedico={nombre} onConfirmar={(g) => setGuardia(g)} />
         ) : (
           <PMChecklist base={guardia.base} movilFisico={guardia.movilFisico} nombreParamedico={nombre} />

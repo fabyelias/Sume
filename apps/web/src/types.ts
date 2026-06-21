@@ -60,6 +60,23 @@ export type Pines = Record<string, string>;
 export type Presencia = { confirmado: boolean; hora: string; movil: string; tarde?: boolean; minutosTarde?: number };
 export type Presencias = Record<string, Presencia>;
 
+// Snapshot persistido del checklist del paramédico para el día. Una vez
+// enviado, sirve para que al volver a entrar al perfil quede bloqueado
+// (no se vuelve a pedir) y solo se puedan seguir cargando novedades hasta
+// que se firma el cierre.
+export type ChecklistPM = {
+  base: Base;
+  movilFisico: string;
+  ok: Record<string, boolean>;
+  detalle: Record<string, { texto: string; foto: boolean }>;
+  oxigeno: { centrales: number; centralesOk: number; manuales: number; manualesOk: number };
+  km: string;
+  enviado: boolean;
+  firmado: boolean;
+  horaCierre: string | null;
+};
+export type ChecklistsPM = Record<string, ChecklistPM>;
+
 export type CategoriaReporte = "mecanica" | "medicacion" | "otro";
 export type EstadoReporte = "abierto" | "en_proceso" | "resuelto";
 export type Reporte = {
