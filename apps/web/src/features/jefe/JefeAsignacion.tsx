@@ -45,11 +45,15 @@ export function JefeAsignacion() {
     return () => clearInterval(iv);
   }, []);
 
+  // Las claves de asignaciones/cierres incluyen la fecha (HOY:nombre) para
+  // que "la guardia de hoy" no arrastre datos de un día anterior.
+  const keyHoy = (nombre: string) => `${HOY}:${nombre}`;
+
   const guardarAsig = async (nombre: string) => {
     if (!form.base || !form.movil) return;
     const base = bases.find((b) => b.id === form.base);
     if (!base) return;
-    const nuevo = { ...asig, [nombre]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
+    const nuevo = { ...asig, [keyHoy(nombre)]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
     setEditando(null);
@@ -57,7 +61,7 @@ export function JefeAsignacion() {
 
   const eliminarAsig = async (nombre: string) => {
     const nuevo = { ...asig };
-    delete nuevo[nombre];
+    delete nuevo[keyHoy(nombre)];
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
   };
@@ -114,8 +118,8 @@ export function JefeAsignacion() {
         <SecTitle icon={<CalendarClock size={13} />}>Asignación de guardia de hoy</SecTitle>
         <div className="grid gap-2 mt-3">
           {paramedicos.map(({ nombre }) => {
-            const a = asig[nombre];
-            const cierre = cierres[nombre];
+            const a = asig[keyHoy(nombre)];
+            const cierre = cierres[keyHoy(nombre)];
             const editMe = editando === nombre;
             return (
               <div key={nombre} className={`${card} overflow-hidden`}>

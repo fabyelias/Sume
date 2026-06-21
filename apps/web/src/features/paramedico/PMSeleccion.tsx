@@ -1,7 +1,7 @@
 import { ChevronRight, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
-import { MOVILES_FIS } from "../../data/constants";
+import { HOY, MOVILES_FIS } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import type { Asignacion, Base } from "../../types";
@@ -23,8 +23,8 @@ export function PMSeleccion({
     const cargar = async () => {
       setBases(await api.bases());
       const todas = await api.getAsignaciones();
-      if (todas[nombreParamedico]) {
-        const a = todas[nombreParamedico];
+      if (todas[`${HOY}:${nombreParamedico}`]) {
+        const a = todas[`${HOY}:${nombreParamedico}`];
         setAsignacionJefe(a);
         setBaseId(a.baseId);
         setMovilFisico(a.movil);

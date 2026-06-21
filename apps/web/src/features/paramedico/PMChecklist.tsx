@@ -176,7 +176,7 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
     setFirmado(true);
     setHoraCierre(hora);
     const cierresActuales = await api.getCierres();
-    cierresActuales[nombreParamedico] = { firmado: true, hora, movil: movilFisico, base: base.label, km, novedades: reportes.length };
+    cierresActuales[checklistKey] = { firmado: true, hora, movil: movilFisico, base: base.label, km, novedades: reportes.length };
     await api.setCierres(cierresActuales);
 
     const checklists = await api.getChecklistsPM();
