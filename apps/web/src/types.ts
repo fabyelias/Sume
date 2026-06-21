@@ -36,14 +36,19 @@ export type Movil = {
   dotNoche: { para: string; med: string; turno: string };
 };
 
+// Clave: `${fecha}:${nombre}:${slot}` — una asignación es válida para
+// cualquier fecha (hoy o un día futuro de la Planificación semanal), no
+// solo "hoy". Ambas pantallas leen y escriben el mismo store.
 export type Asignacion = { base: string; baseId: string; movil: string; turno: string; medico?: string };
 export type Asignaciones = Record<string, Asignacion>;
 
 export type Cierre = { firmado: boolean; hora: string; movil: string; base: string; km: string; novedades: number };
 export type Cierres = Record<string, Cierre>;
 
-export type TurnoCelda = { libre: true } | { libre: false; base: string; baseId: string; movil: string; turno: string; medico?: string };
-export type Turnos = Record<string, TurnoCelda>;
+// Franco (día libre) explícito, separado de Asignaciones: clave
+// `${fecha}:${nombre}`. Si hay Franco para un día, no debería haber
+// guardias asignadas ese día para esa persona.
+export type Francos = Record<string, boolean>;
 
 export type EstadoGuardiaMedica = "pendiente" | "en_camino" | "presente" | "ausente";
 export type GuardiaMedica = {

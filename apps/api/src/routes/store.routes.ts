@@ -8,11 +8,11 @@ export const storeRouter = Router();
 const VALID_KEYS = new Set([
   "asignaciones",
   "cierres",
-  "turnos",
   "guardias_medicos",
   "pines_medicos",
   "presencia_medicos",
   "checklist_paramedicos",
+  "francos",
 ]);
 
 storeRouter.get("/:key", async (req, res) => {

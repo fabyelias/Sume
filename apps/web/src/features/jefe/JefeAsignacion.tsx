@@ -4,7 +4,7 @@ import { SecTitle } from "../../components/shared/SecTitle";
 import { HOY, MOVILES_FIS, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, G, R, card, grad } from "../../lib/theme";
-import type { Asignaciones, Base, Cierres, Medico, Paramedico, TurnoCelda, Turnos } from "../../types";
+import type { Asignaciones, Base, Cierres, Francos, Medico, Paramedico } from "../../types";
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -22,8 +22,8 @@ export function JefeAsignacion() {
   const [form, setForm] = useState({ base: "", movil: "", medico: "" });
   const semIni = new Date(2026, 5, 15);
   const [semBase, setSemBase] = useState(semIni);
-  const [turnos, setTurnos] = useState<Turnos>({});
-  const [editCell, setEditCell] = useState<string | null>(null);
+  const [francos, setFrancos] = useState<Francos>({});
+  const [editCell, setEditCell] = useState<{ fecha: string; nombre: string; slot: Slot } | null>(null);
   const [cellForm, setCellForm] = useState<{ base: string; movil: string; medico: string; libre: boolean }>({ base: "", movil: "", medico: "", libre: false });
   const [savingCell, setSavingCell] = useState(false);
   const [vistaSemana, setVistaSemana] = useState<"paramedico" | "movil">("paramedico");
@@ -32,7 +32,7 @@ export function JefeAsignacion() {
     const load = async () => {
       setAsig(await api.getAsignaciones());
       setCierres(await api.getCierres());
-      setTurnos(await api.getTurnos());
+      setFrancos(await api.getFrancos());
     };
     const loadCatalogo = async () => {
       setParamedicos(await api.paramedicos());
@@ -75,41 +75,68 @@ export function JefeAsignacion() {
   });
   const esHoy = (d: Date) => fmt(d) === HOY;
 
+  // La planificación semanal usa el mismo store que "guardia de hoy"
+  // (Asignaciones), solo que con la fecha del día que se esté editando en
+  // vez de HOY — así una guardia cargada acá aparece también arriba si es
+  // de hoy, y viceversa. Franco se guarda aparte porque es un estado del
+  // día entero, no de un móvil/base puntual.
   const saveCell = async () => {
     if (!editCell) return;
+    const { fecha, nombre, slot } = editCell;
     setSavingCell(true);
-    const base = bases.find((b) => b.id === cellForm.base);
-    const valor: TurnoCelda = cellForm.libre
-      ? { libre: true }
-      : { libre: false, base: base?.label ?? "", baseId: cellForm.base, movil: cellForm.movil, turno: base?.turno ?? "", medico: cellForm.medico || undefined };
-    const nuevo = { ...turnos, [editCell]: valor };
-    setTurnos(nuevo);
-    await api.setTurnos(nuevo);
+    if (cellForm.libre) {
+      const nuevosFrancos = { ...francos, [`${fecha}:${nombre}`]: true };
+      setFrancos(nuevosFrancos);
+      await api.setFrancos(nuevosFrancos);
+      const nuevoAsig = { ...asig };
+      delete nuevoAsig[`${fecha}:${nombre}:1`];
+      delete nuevoAsig[`${fecha}:${nombre}:2`];
+      setAsig(nuevoAsig);
+      await api.setAsignaciones(nuevoAsig);
+    } else {
+      const base = bases.find((b) => b.id === cellForm.base);
+      const nuevoAsig = { ...asig, [`${fecha}:${nombre}:${slot}`]: { base: base?.label ?? "", baseId: cellForm.base, movil: cellForm.movil, turno: base?.turno ?? "", medico: cellForm.medico || undefined } };
+      setAsig(nuevoAsig);
+      await api.setAsignaciones(nuevoAsig);
+      if (francos[`${fecha}:${nombre}`]) {
+        const nuevosFrancos = { ...francos };
+        delete nuevosFrancos[`${fecha}:${nombre}`];
+        setFrancos(nuevosFrancos);
+        await api.setFrancos(nuevosFrancos);
+      }
+    }
     setSavingCell(false);
     setEditCell(null);
   };
 
   const borrarCell = async () => {
     if (!editCell) return;
+    const { fecha, nombre, slot } = editCell;
     setSavingCell(true);
-    const nuevo = { ...turnos };
-    delete nuevo[editCell];
-    setTurnos(nuevo);
-    await api.setTurnos(nuevo);
+    const nuevoAsig = { ...asig };
+    delete nuevoAsig[`${fecha}:${nombre}:${slot}`];
+    setAsig(nuevoAsig);
+    await api.setAsignaciones(nuevoAsig);
+    if (francos[`${fecha}:${nombre}`]) {
+      const nuevosFrancos = { ...francos };
+      delete nuevosFrancos[`${fecha}:${nombre}`];
+      setFrancos(nuevosFrancos);
+      await api.setFrancos(nuevosFrancos);
+    }
     setSavingCell(false);
     setEditCell(null);
   };
 
-  // Mismos datos de "turnos" pero agrupados por móvil en vez de por
+  // Mismos datos de Asignaciones pero agrupados por móvil en vez de por
   // paramédico, para ver de un vistazo qué móvil queda sin cubrir cada día.
-  const movilesEnUso = Array.from(
-    new Set([...MOVILES_FIS, ...Object.values(turnos).filter((t): t is Extract<TurnoCelda, { libre: false }> => !t.libre).map((t) => t.movil)]),
-  );
+  const movilesEnUso = Array.from(new Set([...MOVILES_FIS, ...Object.values(asig).map((a) => a.movil)]));
   const paramedicoPorMovilYDia = (movil: string, d: Date) => {
     const fecha = fmt(d);
     for (const paramedico of paramedicos) {
-      const t = turnos[`${fecha}:${paramedico.nombre}`];
-      if (t && !t.libre && t.movil === movil) return { nombre: paramedico.nombre, base: t.base, medico: t.medico };
+      for (const { id, label } of SLOTS) {
+        const a = asig[`${fecha}:${paramedico.nombre}:${id}`];
+        if (a && a.movil === movil) return { nombre: paramedico.nombre, base: a.base, medico: a.medico, slotLabel: label };
+      }
     }
     return null;
   };
@@ -339,125 +366,166 @@ export function JefeAsignacion() {
                   <p className="text-[11px] font-semibold text-slate-700 leading-tight">{nombre}</p>
                 </div>
                 {diasSemana.map((d, di) => {
-                  const k = `${fmt(d)}:${nombre}`;
-                  const t = turnos[k];
+                  const fecha = fmt(d);
                   const hoy = esHoy(d);
-                  const celEditando = editCell === k;
-                  return (
-                    <div key={di} className={`p-1.5 border-r border-slate-100 last:border-r-0 ${hoy ? "bg-blue-50/40" : ""}`}>
-                      {celEditando ? (
-                        <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-2 space-y-1.5">
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => setCellForm((f) => ({ ...f, libre: false }))}
-                              className={`flex-1 text-[10px] font-bold uppercase py-1 rounded-lg border ${!cellForm.libre ? "text-white border-transparent" : "border-slate-200 text-slate-500 bg-white"}`}
-                              style={!cellForm.libre ? { background: A } : {}}
-                            >
-                              Trabaja
-                            </button>
-                            <button
-                              onClick={() => setCellForm((f) => ({ ...f, libre: true }))}
-                              className={`flex-1 text-[10px] font-bold uppercase py-1 rounded-lg border ${cellForm.libre ? "text-white border-transparent" : "border-slate-200 text-slate-500 bg-white"}`}
-                              style={cellForm.libre ? { background: G } : {}}
-                            >
-                              Franco
-                            </button>
-                          </div>
-                          {!cellForm.libre && (
-                            <>
-                              <select
-                                value={cellForm.base}
-                                onChange={(e) => setCellForm((f) => ({ ...f, base: e.target.value }))}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
-                              >
-                                <option value="">Base</option>
-                                {bases.map((b) => (
-                                  <option key={b.id} value={b.id}>
-                                    {b.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <select
-                                value={cellForm.movil}
-                                onChange={(e) => setCellForm((f) => ({ ...f, movil: e.target.value }))}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
-                              >
-                                <option value="">Móvil</option>
-                                {MOVILES_FIS.map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
-                              <select
-                                value={cellForm.medico}
-                                onChange={(e) => setCellForm((f) => ({ ...f, medico: e.target.value }))}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
-                              >
-                                <option value="">Sin médico</option>
-                                {medicos.map((m) => (
-                                  <option key={m.id} value={m.nombre}>
-                                    {m.nombre}
-                                  </option>
-                                ))}
-                              </select>
-                            </>
-                          )}
-                          <div className="flex gap-1">
-                            <button onClick={() => setEditCell(null)} className="flex-1 py-1 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-500">
-                              ✕
-                            </button>
-                            {t && (
-                              <button onClick={borrarCell} disabled={savingCell} className="flex-1 py-1 rounded-lg border border-rose-200 bg-white text-[10px] font-bold text-rose-500 flex items-center justify-center">
-                                <Trash2 size={11} />
-                              </button>
-                            )}
-                            <button
-                              onClick={saveCell}
-                              disabled={savingCell || (!cellForm.libre && (!cellForm.base || !cellForm.movil))}
-                              className={`flex-1 py-1 rounded-lg text-[10px] font-bold text-white ${!cellForm.libre && (!cellForm.base || !cellForm.movil) ? "bg-slate-300" : ""}`}
-                              style={cellForm.libre || (cellForm.base && cellForm.movil) ? { background: R } : {}}
-                            >
-                              {savingCell ? "..." : "✓"}
-                            </button>
-                          </div>
+                  const esFranco = !!francos[`${fecha}:${nombre}`];
+                  const s1 = asig[`${fecha}:${nombre}:1`];
+                  const s2 = asig[`${fecha}:${nombre}:2`];
+                  const editandoSlot1 = editCell?.fecha === fecha && editCell?.nombre === nombre && editCell?.slot === "1";
+                  const editandoSlot2 = editCell?.fecha === fecha && editCell?.nombre === nombre && editCell?.slot === "2";
+
+                  const abrirEditor = (slot: Slot, prefill?: { base: string; movil: string; medico: string; libre: boolean }) => {
+                    setEditCell({ fecha, nombre, slot });
+                    setCellForm(prefill ?? { base: "", movil: "", medico: "", libre: false });
+                  };
+
+                  const mostrarBorrar = editCell?.slot === "1" ? !!s1 || esFranco : !!s2;
+
+                  const editor = (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-2 space-y-1.5">
+                      {editCell?.slot === "1" && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setCellForm((f) => ({ ...f, libre: false }))}
+                            className={`flex-1 text-[10px] font-bold uppercase py-1 rounded-lg border ${!cellForm.libre ? "text-white border-transparent" : "border-slate-200 text-slate-500 bg-white"}`}
+                            style={!cellForm.libre ? { background: A } : {}}
+                          >
+                            Trabaja
+                          </button>
+                          <button
+                            onClick={() => setCellForm((f) => ({ ...f, libre: true }))}
+                            className={`flex-1 text-[10px] font-bold uppercase py-1 rounded-lg border ${cellForm.libre ? "text-white border-transparent" : "border-slate-200 text-slate-500 bg-white"}`}
+                            style={cellForm.libre ? { background: G } : {}}
+                          >
+                            Franco
+                          </button>
                         </div>
-                      ) : t ? (
-                        <div
-                          className={`rounded-xl p-1.5 text-[10px] leading-tight cursor-pointer ${t.libre ? "bg-slate-100 border border-slate-200" : "border"}`}
-                          style={!t.libre ? { background: `${A}0D`, borderColor: `${A}30` } : {}}
-                          onClick={() => {
-                            setCellForm(t.libre ? { base: "", movil: "", medico: "", libre: true } : { base: t.baseId, movil: t.movil, medico: t.medico ?? "", libre: false });
-                            setEditCell(k);
-                          }}
+                      )}
+                      {!cellForm.libre && (
+                        <>
+                          <select
+                            value={cellForm.base}
+                            onChange={(e) => setCellForm((f) => ({ ...f, base: e.target.value }))}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
+                          >
+                            <option value="">Base</option>
+                            {bases.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={cellForm.movil}
+                            onChange={(e) => setCellForm((f) => ({ ...f, movil: e.target.value }))}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
+                          >
+                            <option value="">Móvil</option>
+                            {MOVILES_FIS.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={cellForm.medico}
+                            onChange={(e) => setCellForm((f) => ({ ...f, medico: e.target.value }))}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] focus:outline-none"
+                          >
+                            <option value="">Sin médico</option>
+                            {medicos.map((m) => (
+                              <option key={m.id} value={m.nombre}>
+                                {m.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                      <div className="flex gap-1">
+                        <button onClick={() => setEditCell(null)} className="flex-1 py-1 rounded-lg border border-slate-200 bg-white text-[10px] font-bold text-slate-500">
+                          ✕
+                        </button>
+                        {mostrarBorrar && (
+                          <button onClick={borrarCell} disabled={savingCell} className="flex-1 py-1 rounded-lg border border-rose-200 bg-white text-[10px] font-bold text-rose-500 flex items-center justify-center">
+                            <Trash2 size={11} />
+                          </button>
+                        )}
+                        <button
+                          onClick={saveCell}
+                          disabled={savingCell || (!cellForm.libre && (!cellForm.base || !cellForm.movil))}
+                          className={`flex-1 py-1 rounded-lg text-[10px] font-bold text-white ${!cellForm.libre && (!cellForm.base || !cellForm.movil) ? "bg-slate-300" : ""}`}
+                          style={cellForm.libre || (cellForm.base && cellForm.movil) ? { background: R } : {}}
                         >
-                          {t.libre ? (
-                            <span className="text-slate-400 font-semibold uppercase">Franco</span>
-                          ) : (
-                            <>
-                              <p className="font-bold text-slate-700">{t.base}</p>
-                              <p style={{ color: R }} className="font-bold">
-                                Móvil {t.movil}
-                              </p>
-                              {t.medico && (
-                                <p style={{ color: A }} className="font-semibold truncate">
-                                  {t.medico}
-                                </p>
-                              )}
-                            </>
+                          {savingCell ? "..." : "✓"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div key={di} className={`p-1.5 border-r border-slate-100 last:border-r-0 space-y-1 ${hoy ? "bg-blue-50/40" : ""}`}>
+                      {editandoSlot1 ? (
+                        editor
+                      ) : esFranco ? (
+                        <div
+                          className="rounded-xl p-1.5 text-[10px] leading-tight cursor-pointer bg-slate-100 border border-slate-200 text-center"
+                          onClick={() => abrirEditor("1", { base: "", movil: "", medico: "", libre: true })}
+                        >
+                          <span className="text-slate-400 font-semibold uppercase">Franco</span>
+                        </div>
+                      ) : s1 ? (
+                        <div
+                          className="rounded-xl p-1.5 text-[10px] leading-tight cursor-pointer border"
+                          style={{ background: `${A}0D`, borderColor: `${A}30` }}
+                          onClick={() => abrirEditor("1", { base: s1.baseId, movil: s1.movil, medico: s1.medico ?? "", libre: false })}
+                        >
+                          <p style={{ color: R }} className="font-bold">
+                            Móvil {s1.movil}
+                          </p>
+                          <p className="text-slate-500">{s1.turno}</p>
+                          {s1.medico && (
+                            <p style={{ color: A }} className="font-semibold truncate">
+                              {s1.medico}
+                            </p>
                           )}
                         </div>
                       ) : (
                         <button
-                          onClick={() => {
-                            setCellForm({ base: "", movil: "", medico: "", libre: false });
-                            setEditCell(k);
-                          }}
-                          className="w-full min-h-[48px] rounded-xl border border-dashed border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 transition-colors flex items-center justify-center"
+                          onClick={() => abrirEditor("1")}
+                          className="w-full min-h-[44px] rounded-xl border border-dashed border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 transition-colors flex items-center justify-center"
                         >
                           <Plus size={12} className="text-slate-300" />
                         </button>
                       )}
+
+                      {!esFranco &&
+                        s1 &&
+                        (editandoSlot2 ? (
+                          editor
+                        ) : s2 ? (
+                          <div
+                            className="rounded-xl p-1.5 text-[10px] leading-tight cursor-pointer border"
+                            style={{ background: `${R}0D`, borderColor: `${R}30` }}
+                            onClick={() => abrirEditor("2", { base: s2.baseId, movil: s2.movil, medico: s2.medico ?? "", libre: false })}
+                          >
+                            <p style={{ color: R }} className="font-bold">
+                              Móvil {s2.movil}
+                            </p>
+                            <p className="text-slate-500">{s2.turno}</p>
+                            {s2.medico && (
+                              <p style={{ color: A }} className="font-semibold truncate">
+                                {s2.medico}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => abrirEditor("2")}
+                            className="w-full py-1 rounded-lg border border-dashed border-slate-200 hover:border-blue-300 text-[9px] text-slate-300 hover:text-blue-500 flex items-center justify-center gap-1"
+                          >
+                            <Plus size={9} /> 2da
+                          </button>
+                        ))}
                     </div>
                   );
                 })}
@@ -492,7 +560,9 @@ export function JefeAsignacion() {
                       {cubierto ? (
                         <div className="rounded-xl p-1.5 text-[10px] leading-tight border" style={{ background: `${A}0D`, borderColor: `${A}30` }}>
                           <p className="font-bold text-slate-700">{cubierto.nombre}</p>
-                          <p className="text-slate-400">{cubierto.base}</p>
+                          <p className="text-slate-400">
+                            {cubierto.base} · {cubierto.slotLabel}
+                          </p>
                           {cubierto.medico && (
                             <p style={{ color: R }} className="font-semibold truncate">
                               {cubierto.medico}

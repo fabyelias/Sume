@@ -5,6 +5,7 @@ import type {
   ChecklistsPM,
   Cierres,
   EstadoReporte,
+  Francos,
   GuardiasMedicas,
   Medico,
   Movil,
@@ -13,7 +14,6 @@ import type {
   Pines,
   Presencias,
   Reporte,
-  Turnos,
 } from "../types";
 
 // En dev, el proxy de Vite reenvía /api al backend local. En producción
@@ -82,8 +82,8 @@ export const api = {
   getCierres: () => getJSON<Cierres>("/store/cierres"),
   setCierres: (v: Cierres) => putJSON<Cierres>("/store/cierres", v),
 
-  getTurnos: () => getJSON<Turnos>("/store/turnos"),
-  setTurnos: (v: Turnos) => putJSON<Turnos>("/store/turnos", v),
+  getFrancos: () => getJSON<Francos>("/store/francos"),
+  setFrancos: (v: Francos) => putJSON<Francos>("/store/francos", v),
 
   getGuardiasMedicas: () => getJSON<GuardiasMedicas>("/store/guardias_medicos"),
   setGuardiasMedicas: (v: GuardiasMedicas) => putJSON<GuardiasMedicas>("/store/guardias_medicos", v),
