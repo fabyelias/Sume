@@ -115,7 +115,7 @@ export function JefeMedicos() {
                   return (
                     <span key={id} className={`flex items-center gap-1.5 text-[11px] font-bold uppercase ${est.cls}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${est.dot}`} />
-                      {est.label}
+                      {g?.horaIngreso ? `${g.horaIngreso}–${g.horaFin || "?"}` : est.label}
                     </span>
                   );
                 })}
@@ -142,9 +142,19 @@ export function JefeMedicos() {
                       </button>
                     ) : null;
                   }
+                  const horaEnVivo = editando ? formG.horaIngreso : g.horaIngreso;
+                  const horaFinEnVivo = editando ? formG.horaFin : g.horaFin;
                   return (
                     <div key={id} className="rounded-xl border border-slate-100 p-3 space-y-3">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                        {label}
+                        {horaEnVivo && (
+                          <span style={{ color: R }}>
+                            {" "}
+                            · {horaEnVivo}–{horaFinEnVivo || "?"}
+                          </span>
+                        )}
+                      </p>
                       {!editando ? (
                         <>
                           <div className="grid grid-cols-2 gap-2 text-sm">

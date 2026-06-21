@@ -153,11 +153,15 @@ export function JefeAsignacion() {
                       </button>
                     );
                   }
+                  const turnoEnVivo = a?.turno || (editMe ? bases.find((b) => b.id === form.base)?.turno : undefined);
                   return (
                     <div key={id} className="rounded-xl border border-slate-100 overflow-hidden">
                       <div className="p-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                            {label}
+                            {turnoEnVivo && <span style={{ color: R }}> · {turnoEnVivo}</span>}
+                          </p>
                           {a && (
                             <p className="text-xs text-slate-600 mt-0.5">
                               {a.base} · Móvil <span style={{ color: R }} className="font-semibold">{a.movil}</span> · {a.turno}
