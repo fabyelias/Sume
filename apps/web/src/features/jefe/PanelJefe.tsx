@@ -6,6 +6,7 @@ import { JefeDireccion } from "./JefeDireccion";
 import { JefeFlota } from "./JefeFlota";
 import { JefeMecanica } from "./JefeMecanica";
 import { JefeMedicos } from "./JefeMedicos";
+import { JefeOperativos } from "./JefeOperativos";
 import { JefePersonal } from "./JefePersonal";
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   { id: "flota", label: "Flota" },
   { id: "asignacion", label: "Turnos" },
   { id: "mecanica", label: "Mecánica" },
+  { id: "operativos", label: "Operativos" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["id"];
@@ -66,6 +68,7 @@ export function PanelJefe({ onBack }: { onBack: () => void }) {
         {tab === "flota" && <JefeFlota />}
         {tab === "asignacion" && <JefeAsignacion />}
         {tab === "mecanica" && <JefeMecanica />}
+        {tab === "operativos" && <JefeOperativos />}
       </main>
     </div>
   );
