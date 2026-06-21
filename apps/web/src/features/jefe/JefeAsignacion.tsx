@@ -51,6 +51,28 @@ export function JefeAsignacion() {
   // en un móvil, 19-07 en otro).
   const keyHoy = (nombre: string, slot: Slot) => `${HOY}:${nombre}:${slot}`;
 
+  // Elegir un médico acá (guardia del paramédico) también le crea/actualiza
+  // su propia guardia (GuardiasMedicas) para esa fecha y slot — si no, el
+  // médico nunca ve nada en su panel aunque el Jefe lo haya "asignado" en
+  // la guardia del paramédico.
+  const sincronizarGuardiaMedico = async (nombreMedico: string | undefined, fecha: string, slot: Slot, movil: string, turno: string) => {
+    if (!nombreMedico) return;
+    const medico = medicos.find((m) => m.nombre === nombreMedico);
+    if (!medico) return;
+    const horas = turno.match(/(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/);
+    const guardiasActuales = await api.getGuardiasMedicas();
+    const key = `${medico.id}:${fecha}:${slot}`;
+    const existente = guardiasActuales[key] || {};
+    guardiasActuales[key] = {
+      ...existente,
+      estado: existente.estado || "pendiente",
+      movilAsig: movil,
+      horaIngreso: horas ? horas[1] : existente.horaIngreso,
+      horaFin: horas ? horas[2] : existente.horaFin,
+    };
+    await api.setGuardiasMedicas(guardiasActuales);
+  };
+
   const guardarAsig = async (nombre: string, slot: Slot) => {
     if (!form.base || !form.movil) return;
     const base = bases.find((b) => b.id === form.base);
@@ -58,6 +80,7 @@ export function JefeAsignacion() {
     const nuevo = { ...asig, [keyHoy(nombre, slot)]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
+    await sincronizarGuardiaMedico(form.medico, HOY, slot, form.movil, base.turno);
     setEditando(null);
   };
 
@@ -98,6 +121,7 @@ export function JefeAsignacion() {
       const nuevoAsig = { ...asig, [`${fecha}:${nombre}:${slot}`]: { base: base?.label ?? "", baseId: cellForm.base, movil: cellForm.movil, turno: base?.turno ?? "", medico: cellForm.medico || undefined } };
       setAsig(nuevoAsig);
       await api.setAsignaciones(nuevoAsig);
+      await sincronizarGuardiaMedico(cellForm.medico, fecha, slot, cellForm.movil, base?.turno ?? "");
       if (francos[`${fecha}:${nombre}`]) {
         const nuevosFrancos = { ...francos };
         delete nuevosFrancos[`${fecha}:${nombre}`];
