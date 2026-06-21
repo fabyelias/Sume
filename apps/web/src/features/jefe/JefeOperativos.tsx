@@ -38,7 +38,7 @@ export function JefeOperativos() {
   };
 
   const medicoDe = (movilId: string) => {
-    const entry = Object.entries(presencias).find(([k, v]) => k.endsWith(`:${HOY}`) && v.movil === movilId && v.confirmado);
+    const entry = Object.entries(presencias).find(([k, v]) => k.includes(`:${HOY}:`) && v.movil === movilId && v.confirmado);
     if (!entry) return null;
     const medicoId = entry[0].split(":")[0];
     return medicos.find((m) => m.id === medicoId)?.nombre ?? "Médico";

@@ -10,3 +10,12 @@ export const HOY = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).pa
 
 export const MOVILES_FIS = ["538", "537", "531", "533", "532", "535", "Kangoo", "Polo 1", "Polo 2"];
 export const MOVILES_MED = ["531", "530", "527", "Kangoo"];
+
+// Paramédicos y médicos a veces hacen las 24hs divididas en dos guardias
+// distintas el mismo día (ej: 07-19 en un móvil, 19-07 en otro móvil/base).
+// SLOTS modela esos dos turnos posibles por persona por día.
+export type Slot = "1" | "2";
+export const SLOTS: { id: Slot; label: string }[] = [
+  { id: "1", label: "Guardia 1" },
+  { id: "2", label: "Guardia 2" },
+];

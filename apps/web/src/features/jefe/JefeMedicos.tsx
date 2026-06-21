@@ -2,7 +2,7 @@ import { CheckCircle2, ChevronDown, Clock, Lock, Pencil, Phone, Plus, Stethoscop
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
-import { HOY, MOVILES_MED } from "../../data/constants";
+import { HOY, MOVILES_MED, SLOTS, type Slot } from "../../data/constants";
 import type { EstadoGuardiaMedica, GuardiaMedica, GuardiasMedicas, Medico, Pines, Presencias } from "../../types";
 
 const MEDICO_VACIO: Omit<Medico, "id"> = { nombre: "", especialidad: "", telefono: "", movilFijo: "", turno: "" };
@@ -29,7 +29,7 @@ export function JefeMedicos() {
   const [presencias, setPresencias] = useState<Presencias>({});
   const [expandG, setExpandG] = useState<string | null>(null);
   const [expandP, setExpandP] = useState<string | null>(null);
-  const [editG, setEditG] = useState<string | null>(null);
+  const [editG, setEditG] = useState<{ id: string; slot: Slot } | null>(null);
   const [formG, setFormG] = useState<GuardiaMedica>({});
   const [editPin, setEditPin] = useState<string | null>(null);
   const [pinForm, setPinForm] = useState({ a: "", b: "" });
@@ -65,10 +65,12 @@ export function JefeMedicos() {
     await recargarMedicos();
   };
 
-  const keyG = (id: string) => `${id}:${HOY}`;
+  // Hasta 2 guardias por médico el mismo día (ej: 07-19 en un móvil,
+  // 19-07 en otro), igual que para los paramédicos.
+  const keyG = (id: string, slot: Slot) => `${id}:${HOY}:${slot}`;
 
-  const saveG = async (id: string, datos: GuardiaMedica) => {
-    const nuevo = { ...guardias, [keyG(id)]: datos };
+  const saveG = async (id: string, slot: Slot, datos: GuardiaMedica) => {
+    const nuevo = { ...guardias, [keyG(id, slot)]: datos };
     setGuardias(nuevo);
     await api.setGuardiasMedicas(nuevo);
   };
@@ -89,10 +91,8 @@ export function JefeMedicos() {
   const renderGuardias = () => (
     <div className="space-y-3">
       {medicos.map((med) => {
-        const g = guardias[keyG(med.id)] || {};
-        const est = ESTADO_MAP[g.estado || "pendiente"];
+        const slot1 = guardias[keyG(med.id, "1")];
         const open = expandG === med.id;
-        const editando = editG === med.id;
         return (
           <div key={med.id} className={`${card} overflow-hidden`}>
             <button onClick={() => setExpandG(open ? null : med.id)} className="w-full flex items-center justify-between p-4 text-left">
@@ -108,131 +108,162 @@ export function JefeMedicos() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase ${est.cls}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${est.dot}`} />
-                  {est.label}
-                </span>
+                {SLOTS.map(({ id }) => {
+                  const g = guardias[keyG(med.id, id)];
+                  if (id === "2" && !slot1) return null;
+                  const est = ESTADO_MAP[g?.estado || "pendiente"];
+                  return (
+                    <span key={id} className={`flex items-center gap-1.5 text-[11px] font-bold uppercase ${est.cls}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${est.dot}`} />
+                      {est.label}
+                    </span>
+                  );
+                })}
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
               </div>
             </button>
             {open && (
               <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
-                {!editando ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-lg bg-slate-50 p-2.5">
-                        <p className="text-xs text-slate-400 mb-0.5">Ingreso</p>
-                        <p className="font-semibold">{g.horaIngreso || "—"}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2.5">
-                        <p className="text-xs text-slate-400 mb-0.5">Fin</p>
-                        <p className="font-semibold">{g.horaFin || "—"}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2.5">
-                        <p className="text-xs text-slate-400 mb-0.5">Móvil hoy</p>
-                        <p className="font-semibold" style={{ color: R }}>
-                          {g.movilAsig || med.movilFijo}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-2.5">
-                        <p className="text-xs text-slate-400 mb-0.5">Traslado</p>
-                        <p className="font-semibold">{g.traslado || "—"}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setEditG(med.id);
-                        setFormG({ ...g, estado: g.estado || "pendiente", movilAsig: g.movilAsig || med.movilFijo });
-                      }}
-                      className="flex items-center gap-2 text-sm text-slate-500 border border-slate-200 rounded-xl px-3 py-2 hover:bg-slate-50 transition-colors"
-                    >
-                      <Pencil size={14} /> Editar guardia
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Estado</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {(Object.entries(ESTADO_MAP) as [EstadoGuardiaMedica, (typeof ESTADO_MAP)[EstadoGuardiaMedica]][]).map(([id, e]) => (
-                          <button
-                            key={id}
-                            onClick={() => setFormG((f) => ({ ...f, estado: id }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.estado === id ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={formG.estado === id ? { background: A } : {}}
-                          >
-                            {e.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Móvil hoy</p>
-                      <div className="flex flex-wrap gap-2">
-                        {MOVILES_MED.map((m) => (
-                          <button
-                            key={m}
-                            onClick={() => setFormG((f) => ({ ...f, movilAsig: m }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.movilAsig === m ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={formG.movilAsig === m ? { background: R } : {}}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">Ingreso</p>
-                        <input
-                          type="time"
-                          value={formG.horaIngreso || ""}
-                          onChange={(e) => setFormG((f) => ({ ...f, horaIngreso: e.target.value }))}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">Fin</p>
-                        <input
-                          type="time"
-                          value={formG.horaFin || ""}
-                          onChange={(e) => setFormG((f) => ({ ...f, horaFin: e.target.value }))}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Traslado</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {["Viene solo", "Uber / Remis", "Lo busca un móvil"].map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setFormG((f) => ({ ...f, traslado: t }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.traslado === t ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={formG.traslado === t ? { background: A } : {}}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditG(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
-                        Cancelar
-                      </button>
+                {SLOTS.map(({ id, label }) => {
+                  const slot2 = guardias[keyG(med.id, "2")];
+                  const g = guardias[keyG(med.id, id)] || {};
+                  const editando = editG?.id === med.id && editG?.slot === id;
+                  if (id === "2" && !slot2 && !editando) {
+                    return slot1 ? (
                       <button
+                        key={id}
                         onClick={() => {
-                          saveG(med.id, formG);
-                          setEditG(null);
+                          setEditG({ id: med.id, slot: "2" });
+                          setFormG({ estado: "pendiente", movilAsig: med.movilFijo });
                         }}
-                        className="flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider text-white"
-                        style={{ background: grad }}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-slate-200 text-xs font-semibold text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors"
                       >
-                        Guardar
+                        <Plus size={13} /> Agregar 2da guardia (24 hs en otro móvil)
                       </button>
+                    ) : null;
+                  }
+                  return (
+                    <div key={id} className="rounded-xl border border-slate-100 p-3 space-y-3">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                      {!editando ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <p className="text-xs text-slate-400 mb-0.5">Ingreso</p>
+                              <p className="font-semibold">{g.horaIngreso || "—"}</p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <p className="text-xs text-slate-400 mb-0.5">Fin</p>
+                              <p className="font-semibold">{g.horaFin || "—"}</p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <p className="text-xs text-slate-400 mb-0.5">Móvil hoy</p>
+                              <p className="font-semibold" style={{ color: R }}>
+                                {g.movilAsig || med.movilFijo}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-slate-50 p-2.5">
+                              <p className="text-xs text-slate-400 mb-0.5">Traslado</p>
+                              <p className="font-semibold">{g.traslado || "—"}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEditG({ id: med.id, slot: id });
+                              setFormG({ ...g, estado: g.estado || "pendiente", movilAsig: g.movilAsig || med.movilFijo });
+                            }}
+                            className="flex items-center gap-2 text-sm text-slate-500 border border-slate-200 rounded-xl px-3 py-2 hover:bg-slate-50 transition-colors"
+                          >
+                            <Pencil size={14} /> {g.estado ? "Editar guardia" : "Asignar guardia"}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Estado</p>
+                            <div className="flex gap-2 flex-wrap">
+                              {(Object.entries(ESTADO_MAP) as [EstadoGuardiaMedica, (typeof ESTADO_MAP)[EstadoGuardiaMedica]][]).map(([estId, e]) => (
+                                <button
+                                  key={estId}
+                                  onClick={() => setFormG((f) => ({ ...f, estado: estId }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.estado === estId ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={formG.estado === estId ? { background: A } : {}}
+                                >
+                                  {e.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Móvil hoy</p>
+                            <div className="flex flex-wrap gap-2">
+                              {MOVILES_MED.map((m) => (
+                                <button
+                                  key={m}
+                                  onClick={() => setFormG((f) => ({ ...f, movilAsig: m }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.movilAsig === m ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={formG.movilAsig === m ? { background: R } : {}}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">Ingreso</p>
+                              <input
+                                type="time"
+                                value={formG.horaIngreso || ""}
+                                onChange={(e) => setFormG((f) => ({ ...f, horaIngreso: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">Fin</p>
+                              <input
+                                type="time"
+                                value={formG.horaFin || ""}
+                                onChange={(e) => setFormG((f) => ({ ...f, horaFin: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Traslado</p>
+                            <div className="flex gap-2 flex-wrap">
+                              {["Viene solo", "Uber / Remis", "Lo busca un móvil"].map((t) => (
+                                <button
+                                  key={t}
+                                  onClick={() => setFormG((f) => ({ ...f, traslado: t }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${formG.traslado === t ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={formG.traslado === t ? { background: A } : {}}
+                                >
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditG(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => {
+                                saveG(med.id, id, formG);
+                                setEditG(null);
+                              }}
+                              className="flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider text-white"
+                              style={{ background: grad }}
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -367,28 +398,30 @@ export function JefeMedicos() {
                     <span className="font-bold">Kangoo · Código Verde</span> — Horario variable según disponibilidad del médico.
                   </div>
                 )}
-                <div className="border-t border-slate-100 pt-3">
-                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 mb-2">
+                <div className="border-t border-slate-100 pt-3 space-y-2">
+                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
                     <Clock size={14} /> Presencia de hoy
                   </p>
-                  {(() => {
-                    const pres = presencias[med.id];
-                    if (!pres?.confirmado) {
-                      return <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-400">Todavía no fichó presente.</div>;
-                    }
-                    if (pres.tarde) {
-                      return (
-                        <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
-                          <span className="font-bold">Llegó tarde</span> — fichó a las {pres.hora}, {formatTarde(pres.minutosTarde ?? 0)} después de lo previsto.
-                        </div>
-                      );
-                    }
+                  {!guardias[keyG(med.id, "1")] && <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-400">Sin guardia asignada hoy.</div>}
+                  {SLOTS.filter(({ id }) => guardias[keyG(med.id, id)]).map(({ id, label }) => {
+                    const pres = presencias[`${med.id}:${HOY}:${id}`];
                     return (
-                      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
-                        <span className="font-bold">A horario</span> — fichó presente a las {pres.hora}.
+                      <div key={id}>
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">{label}</p>
+                        {!pres?.confirmado ? (
+                          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-400">Todavía no fichó presente.</div>
+                        ) : pres.tarde ? (
+                          <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+                            <span className="font-bold">Llegó tarde</span> — fichó a las {pres.hora}, {formatTarde(pres.minutosTarde ?? 0)} después de lo previsto.
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                            <span className="font-bold">A horario</span> — fichó presente a las {pres.hora}.
+                          </div>
+                        )}
                       </div>
                     );
-                  })()}
+                  })}
                 </div>
                 <div className="border-t border-slate-100 pt-3">
                   <div className="flex items-center justify-between mb-3">

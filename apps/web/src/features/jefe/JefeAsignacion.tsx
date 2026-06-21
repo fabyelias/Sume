@@ -1,7 +1,7 @@
 import { Calendar, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Truck, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
-import { HOY, MOVILES_FIS } from "../../data/constants";
+import { HOY, MOVILES_FIS, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, G, R, card, grad } from "../../lib/theme";
 import type { Asignaciones, Base, Cierres, Medico, Paramedico, TurnoCelda, Turnos } from "../../types";
@@ -18,7 +18,7 @@ export function JefeAsignacion() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [asig, setAsig] = useState<Asignaciones>({});
   const [cierres, setCierres] = useState<Cierres>({});
-  const [editando, setEditando] = useState<string | null>(null);
+  const [editando, setEditando] = useState<{ nombre: string; slot: Slot } | null>(null);
   const [form, setForm] = useState({ base: "", movil: "", medico: "" });
   const semIni = new Date(2026, 5, 15);
   const [semBase, setSemBase] = useState(semIni);
@@ -45,23 +45,25 @@ export function JefeAsignacion() {
     return () => clearInterval(iv);
   }, []);
 
-  // Las claves de asignaciones/cierres incluyen la fecha (HOY:nombre) para
-  // que "la guardia de hoy" no arrastre datos de un día anterior.
-  const keyHoy = (nombre: string) => `${HOY}:${nombre}`;
+  // Las claves de asignaciones/cierres incluyen la fecha y el slot
+  // (HOY:nombre:slot) para que "la guardia de hoy" no arrastre datos de un
+  // día anterior, y para soportar hasta 2 guardias el mismo día (ej: 07-19
+  // en un móvil, 19-07 en otro).
+  const keyHoy = (nombre: string, slot: Slot) => `${HOY}:${nombre}:${slot}`;
 
-  const guardarAsig = async (nombre: string) => {
+  const guardarAsig = async (nombre: string, slot: Slot) => {
     if (!form.base || !form.movil) return;
     const base = bases.find((b) => b.id === form.base);
     if (!base) return;
-    const nuevo = { ...asig, [keyHoy(nombre)]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
+    const nuevo = { ...asig, [keyHoy(nombre, slot)]: { base: base.label, baseId: form.base, movil: form.movil, turno: base.turno, medico: form.medico || undefined } };
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
     setEditando(null);
   };
 
-  const eliminarAsig = async (nombre: string) => {
+  const eliminarAsig = async (nombre: string, slot: Slot) => {
     const nuevo = { ...asig };
-    delete nuevo[keyHoy(nombre)];
+    delete nuevo[keyHoy(nombre, slot)];
     setAsig(nuevo);
     await api.setAsignaciones(nuevo);
   };
@@ -116,128 +118,154 @@ export function JefeAsignacion() {
     <div className="space-y-8">
       <section>
         <SecTitle icon={<CalendarClock size={13} />}>Asignación de guardia de hoy</SecTitle>
-        <div className="grid gap-2 mt-3">
+        <p className="text-sm text-slate-500 mt-2 mb-3">
+          Hasta 2 guardias por persona el mismo día, para cuando hacen las 24hs divididas en dos móviles o bases distintas.
+        </p>
+        <div className="grid gap-2">
           {paramedicos.map(({ nombre }) => {
-            const a = asig[keyHoy(nombre)];
-            const cierre = cierres[keyHoy(nombre)];
-            const editMe = editando === nombre;
+            const slot1 = asig[keyHoy(nombre, "1")];
+            const hayAlguna = !!slot1 || !!asig[keyHoy(nombre, "2")];
             return (
-              <div key={nombre} className={`${card} overflow-hidden`}>
-                <div className="p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
-                      {nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800">{nombre}</p>
-                      {a ? (
-                        <p className="text-xs text-slate-500">
-                          {a.base} · Móvil <span style={{ color: R }} className="font-semibold">{a.movil}</span> · {a.turno}
-                          {a.medico && (
-                            <>
-                              {" · "}
-                              <span style={{ color: A }} className="font-semibold">{a.medico}</span>
-                            </>
+              <div key={nombre} className={`${card} overflow-hidden p-3 space-y-2`}>
+                <div className="flex items-center gap-3 px-1">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
+                    {nombre.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800">{nombre}</p>
+                  {!hayAlguna && <p className="text-xs text-slate-400 italic">Sin asignación</p>}
+                </div>
+                {SLOTS.map(({ id, label }) => {
+                  if (id === "2" && !slot1) return null;
+                  const a = asig[keyHoy(nombre, id)];
+                  const cierre = cierres[keyHoy(nombre, id)];
+                  const editMe = editando?.nombre === nombre && editando?.slot === id;
+                  if (!a && !editMe) {
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => {
+                          setEditando({ nombre, slot: id });
+                          setForm({ base: "", movil: "", medico: "" });
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-dashed border-slate-200 text-xs font-semibold text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors"
+                      >
+                        <Plus size={13} /> {id === "1" ? "Agregar guardia" : "Agregar 2da guardia (24 hs en otro móvil)"}
+                      </button>
+                    );
+                  }
+                  return (
+                    <div key={id} className="rounded-xl border border-slate-100 overflow-hidden">
+                      <div className="p-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                          {a && (
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              {a.base} · Móvil <span style={{ color: R }} className="font-semibold">{a.movil}</span> · {a.turno}
+                              {a.medico && (
+                                <>
+                                  {" · "}
+                                  <span style={{ color: A }} className="font-semibold">{a.medico}</span>
+                                </>
+                              )}
+                            </p>
                           )}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">Sin asignación</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {cierre?.firmado && (
+                            <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1">
+                              <CheckCircle2 size={11} />
+                              Firmado {cierre.hora}
+                            </span>
+                          )}
+                          {!cierre?.firmado && a && <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200">En curso</span>}
+                          <button
+                            onClick={() => {
+                              setEditando({ nombre, slot: id });
+                              setForm({ base: a?.baseId || "", movil: a?.movil || "", medico: a?.medico || "" });
+                            }}
+                            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50"
+                          >
+                            <Pencil size={14} className="text-slate-400" />
+                          </button>
+                          {a && (
+                            <button onClick={() => eliminarAsig(nombre, id)} className="p-2 rounded-lg border border-slate-200 hover:bg-red-50">
+                              <Trash2 size={14} className="text-rose-400" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {editMe && (
+                        <div className="border-t border-slate-100 px-3 pb-3 pt-2 space-y-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Base</p>
+                            <div className="flex flex-wrap gap-2">
+                              {bases.map((b) => (
+                                <button
+                                  key={b.id}
+                                  onClick={() => setForm((f) => ({ ...f, base: b.id }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.base === b.id ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={form.base === b.id ? { background: A } : {}}
+                                >
+                                  {b.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Móvil</p>
+                            <div className="flex flex-wrap gap-2">
+                              {MOVILES_FIS.map((m) => (
+                                <button
+                                  key={m}
+                                  onClick={() => setForm((f) => ({ ...f, movil: m }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.movil === m ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={form.movil === m ? { background: R } : {}}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Médico (opcional)</p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => setForm((f) => ({ ...f, medico: "" }))}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${!form.medico ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                style={!form.medico ? { background: G } : {}}
+                              >
+                                Sin médico
+                              </button>
+                              {medicos.map((m) => (
+                                <button
+                                  key={m.id}
+                                  onClick={() => setForm((f) => ({ ...f, medico: m.nombre }))}
+                                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.medico === m.nombre ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
+                                  style={form.medico === m.nombre ? { background: A } : {}}
+                                >
+                                  {m.nombre}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditando(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => guardarAsig(nombre, id)}
+                              disabled={!form.base || !form.movil}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider ${form.base && form.movil ? "text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
+                              style={form.base && form.movil ? { background: grad } : {}}
+                            >
+                              Confirmar
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {cierre?.firmado && (
-                      <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1">
-                        <CheckCircle2 size={11} />
-                        Firmado {cierre.hora}
-                      </span>
-                    )}
-                    {!cierre?.firmado && a && <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200">En curso</span>}
-                    <button
-                      onClick={() => {
-                        setEditando(nombre);
-                        setForm({ base: a?.baseId || "", movil: a?.movil || "", medico: a?.medico || "" });
-                      }}
-                      className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50"
-                    >
-                      <Pencil size={14} className="text-slate-400" />
-                    </button>
-                    {a && (
-                      <button onClick={() => eliminarAsig(nombre)} className="p-2 rounded-lg border border-slate-200 hover:bg-red-50">
-                        <Trash2 size={14} className="text-rose-400" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {editMe && (
-                  <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Base</p>
-                      <div className="flex flex-wrap gap-2">
-                        {bases.map((b) => (
-                          <button
-                            key={b.id}
-                            onClick={() => setForm((f) => ({ ...f, base: b.id }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.base === b.id ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={form.base === b.id ? { background: A } : {}}
-                          >
-                            {b.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Móvil</p>
-                      <div className="flex flex-wrap gap-2">
-                        {MOVILES_FIS.map((m) => (
-                          <button
-                            key={m}
-                            onClick={() => setForm((f) => ({ ...f, movil: m }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.movil === m ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={form.movil === m ? { background: R } : {}}
-                          >
-                            {m}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold mb-2">Médico (opcional)</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setForm((f) => ({ ...f, medico: "" }))}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${!form.medico ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                          style={!form.medico ? { background: G } : {}}
-                        >
-                          Sin médico
-                        </button>
-                        {medicos.map((m) => (
-                          <button
-                            key={m.id}
-                            onClick={() => setForm((f) => ({ ...f, medico: m.nombre }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${form.medico === m.nombre ? "text-white border-transparent" : "border-slate-200 text-slate-500"}`}
-                            style={form.medico === m.nombre ? { background: A } : {}}
-                          >
-                            {m.nombre}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditando(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={() => guardarAsig(nombre)}
-                        disabled={!form.base || !form.movil}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-display uppercase tracking-wider ${form.base && form.movil ? "text-white" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
-                        style={form.base && form.movil ? { background: grad } : {}}
-                      >
-                        Confirmar
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             );
           })}

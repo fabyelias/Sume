@@ -45,7 +45,7 @@ export function JefeDireccion() {
   // fichado presente hoy.
   const operativo = (movilId: string) => {
     const pmOk = Object.entries(checklists).some(([k, v]) => k.startsWith(`${HOY}:`) && v.movilFisico === movilId && v.enviado);
-    const medOk = Object.entries(presencias).some(([k, v]) => k.endsWith(`:${HOY}`) && v.movil === movilId && v.confirmado);
+    const medOk = Object.entries(presencias).some(([k, v]) => k.includes(`:${HOY}:`) && v.movil === movilId && v.confirmado);
     return MOVILES_MED.includes(movilId) ? pmOk && medOk : pmOk;
   };
 

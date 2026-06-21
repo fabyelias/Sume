@@ -1,11 +1,11 @@
 import { AlertCircle, ArrowLeft, CheckCircle2, Stethoscope, User } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HOY } from "../../data/constants";
+import { HOY, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport, grad } from "../../lib/theme";
 import type { GuardiaMedica, Medico, Presencia } from "../../types";
 
-export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBack: () => void }) {
+export function PanelMedicoPrincipal({ medico, slot, onBack }: { medico: Medico; slot: Slot; onBack: () => void }) {
   const [guardia, setGuardia] = useState<GuardiaMedica | null>(null);
   const [paramedicoOk, setParamedicoOk] = useState(false);
   const [presencia, setPresencia] = useState<Presencia | null>(null);
@@ -14,10 +14,11 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
   const [pinError, setPinError] = useState(false);
   const [cargando, setCargando] = useState(true);
 
+  const k = `${medico.id}:${HOY}:${slot}`;
+
   useEffect(() => {
     const cargar = async () => {
       const g = await api.getGuardiasMedicas();
-      const k = `${medico.id}:${HOY}`;
       if (g[k]) setGuardia(g[k]);
 
       // El checklist del paramédico se considera "confirmado" cuando algún
@@ -29,8 +30,7 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
       setParamedicoOk(pmOk);
 
       const p = await api.getPresencias();
-      const presKey = `${medico.id}:${HOY}`;
-      if (p[presKey]) setPresencia(p[presKey]);
+      if (p[k]) setPresencia(p[k]);
       else setPresencia(null);
 
       const pines = await api.getPines();
@@ -41,7 +41,7 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
     cargar();
     const iv = setInterval(cargar, 8000);
     return () => clearInterval(iv);
-  }, [medico.id]);
+  }, [medico.id, k]);
 
   // Hora de ingreso esperada para hoy: la que fijó el Jefe para esta guardia
   // puntual, o si no se especificó, la del turno fijo del médico
@@ -81,12 +81,11 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
     const datos: Presencia = { confirmado: true, hora, movil: movilHoy, tarde, minutosTarde };
     setPresencia(datos);
     const todas = await api.getPresencias();
-    todas[`${medico.id}:${HOY}`] = datos;
+    todas[k] = datos;
     await api.setPresencias(todas);
 
     // La guardia pasa de "pendiente" a "presente" para que el Jefe vea el
     // cambio reflejado también en Panel Jefe → Médicos → Guardias de hoy.
-    const k = `${medico.id}:${HOY}`;
     const guardiasActuales = await api.getGuardiasMedicas();
     const nuevaGuardia = { ...guardiasActuales[k], estado: "presente" as const };
     guardiasActuales[k] = nuevaGuardia;
@@ -121,7 +120,9 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
             <p className="font-display text-2xl tracking-tight">
               <span style={{ color: R }}>SUME</span> <span style={{ color: A }}>SALUD</span>
             </p>
-            <p className="text-[10px] text-slate-400 tracking-[0.4em] uppercase mt-0.5">Panel Médico · {medico.nombre}</p>
+            <p className="text-[10px] text-slate-400 tracking-[0.4em] uppercase mt-0.5">
+              Panel Médico · {medico.nombre} · {SLOTS.find((s) => s.id === slot)?.label}
+            </p>
           </div>
         </div>
       </header>

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
-import { HOY } from "../../data/constants";
+import { HOY, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import type { Base, CategoriaReporte, Reporte } from "../../types";
@@ -64,7 +64,7 @@ const CATEGORIA_ITEM: Record<ItemKey, CategoriaReporte> = {
 
 const ESTADO_REPORTE_LABEL: Record<string, string> = { abierto: "Pendiente", en_proceso: "En proceso", resuelto: "Resuelto" };
 
-export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Base; movilFisico: string; nombreParamedico: string }) {
+export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { base: Base; movilFisico: string; nombreParamedico: string; slot: Slot }) {
   const [{ ok, detalle }, setState] = useState(buildInitialPM());
   const [oxigeno, setOxigeno] = useState({ centrales: 2, centralesOk: 2, manuales: 2, manualesOk: 2 });
   const [km, setKm] = useState("");
@@ -78,7 +78,7 @@ export function PMChecklist({ base, movilFisico, nombreParamedico }: { base: Bas
   const [horaCierre, setHoraCierre] = useState<string | null>(null);
   const [cargandoChecklist, setCargandoChecklist] = useState(true);
   const PIN_CORRECTO = "1234";
-  const checklistKey = `${HOY}:${nombreParamedico}`;
+  const checklistKey = `${HOY}:${nombreParamedico}:${slot}`;
 
   // Si ya se envió el checklist hoy (quedó guardado), se carga bloqueado tal
   // cual quedó: no se vuelve a pedir, solo se pueden seguir cargando

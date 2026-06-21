@@ -1,16 +1,18 @@
 import { ChevronRight, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SecTitle } from "../../components/shared/SecTitle";
-import { HOY, MOVILES_FIS } from "../../data/constants";
+import { HOY, MOVILES_FIS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import type { Asignacion, Base } from "../../types";
 
 export function PMSeleccion({
   nombreParamedico,
+  slot,
   onConfirmar,
 }: {
   nombreParamedico: string;
+  slot: Slot;
   onConfirmar: (g: { base: Base; movilFisico: string }) => void;
 }) {
   const [bases, setBases] = useState<Base[]>([]);
@@ -23,8 +25,9 @@ export function PMSeleccion({
     const cargar = async () => {
       setBases(await api.bases());
       const todas = await api.getAsignaciones();
-      if (todas[`${HOY}:${nombreParamedico}`]) {
-        const a = todas[`${HOY}:${nombreParamedico}`];
+      const key = `${HOY}:${nombreParamedico}:${slot}`;
+      if (todas[key]) {
+        const a = todas[key];
         setAsignacionJefe(a);
         setBaseId(a.baseId);
         setMovilFisico(a.movil);
@@ -32,7 +35,7 @@ export function PMSeleccion({
       setCargando(false);
     };
     cargar();
-  }, [nombreParamedico]);
+  }, [nombreParamedico, slot]);
 
   const base = bases.find((b) => b.id === baseId);
   const puedeConfirmar = baseId && movilFisico;

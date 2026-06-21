@@ -1,9 +1,9 @@
-import { ArrowLeft, Asterisk } from "lucide-react";
+import { ArrowLeft, Asterisk, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HOY } from "../../data/constants";
+import { HOY, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport } from "../../lib/theme";
-import type { Base, Paramedico } from "../../types";
+import type { Asignaciones, Base, Paramedico } from "../../types";
 import { PMChecklist } from "./PMChecklist";
 import { PMSeleccion } from "./PMSeleccion";
 
@@ -11,27 +11,62 @@ type Guardia = { base: Base; movilFisico: string };
 
 export function PanelParamedico({ onBack }: { onBack: () => void }) {
   const [paramedicos, setParamedicos] = useState<Paramedico[]>([]);
+  const [asigHoy, setAsigHoy] = useState<Asignaciones>({});
+  const [cargandoLista, setCargandoLista] = useState(true);
   const [nombre, setNombre] = useState<string | null>(null);
+  const [slot, setSlot] = useState<Slot | null>(null);
   const [guardia, setGuardia] = useState<Guardia | null>(null);
   const [buscandoGuardia, setBuscandoGuardia] = useState(false);
 
   useEffect(() => {
-    api.paramedicos().then(setParamedicos);
+    Promise.all([api.paramedicos(), api.getAsignaciones()]).then(([ps, a]) => {
+      setParamedicos(ps);
+      setAsigHoy(a);
+      setCargandoLista(false);
+    });
   }, []);
 
-  // Si ya tiene un checklist enviado hoy, salta directo a él en vez de
-  // hacerlo elegir base/móvil de nuevo (eso ya quedó fijo al confirmar).
+  const slotsDe = (n: string): Slot[] => SLOTS.map((s) => s.id).filter((s) => !!asigHoy[`${HOY}:${n}:${s}`]);
+
+  // Si ya tiene un checklist enviado hoy para esa guardia puntual, salta
+  // directo a él en vez de hacerlo elegir base/móvil de nuevo.
   useEffect(() => {
-    if (!nombre) return;
+    if (!nombre || !slot) {
+      setGuardia(null);
+      return;
+    }
     setBuscandoGuardia(true);
     api.getChecklistsPM().then((checklists) => {
-      const rec = checklists[`${HOY}:${nombre}`];
-      if (rec) setGuardia({ base: rec.base, movilFisico: rec.movilFisico });
+      const rec = checklists[`${HOY}:${nombre}:${slot}`];
+      setGuardia(rec ? { base: rec.base, movilFisico: rec.movilFisico } : null);
       setBuscandoGuardia(false);
     });
-  }, [nombre]);
+  }, [nombre, slot]);
+
+  const elegirNombre = (n: string) => {
+    setNombre(n);
+    const slots = slotsDe(n);
+    setSlot(slots.length === 1 ? slots[0] : null);
+  };
+
+  const volver = () => {
+    if (guardia) {
+      setGuardia(null);
+      return;
+    }
+    if (slot && slotsDe(nombre ?? "").length > 1) {
+      setSlot(null);
+      return;
+    }
+    if (nombre) {
+      setNombre(null);
+      return;
+    }
+    onBack();
+  };
 
   if (!nombre) {
+    const disponibles = paramedicos.filter(({ nombre: n }) => slotsDe(n).length > 0);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: BG, fontFamily: "Inter, sans-serif" }}>
         <style>{fontImport}</style>
@@ -49,26 +84,34 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
             <p className="text-sm text-slate-400 mt-1">¿Quién toma guardia hoy?</p>
           </div>
           <div className="grid gap-2">
-            {paramedicos.map(({ nombre: n }) => (
-              <button key={n} onClick={() => setNombre(n)} className={`${card} p-4 text-left flex items-center gap-3 hover:border-blue-200 transition-colors`}>
-                <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
-                  {n.split(" ").map((x) => x[0]).join("").slice(0, 2)}
-                </div>
-                <p className="font-semibold text-slate-800">{n}</p>
-              </button>
-            ))}
+            {cargandoLista ? (
+              <div className={`${card} p-6 text-center text-slate-400 text-sm`}>Cargando...</div>
+            ) : disponibles.length === 0 ? (
+              <div className={`${card} p-6 text-center text-slate-400 text-sm`}>Todavía nadie tiene una guardia asignada hoy. Hablá con el Jefe de Paramédicos.</div>
+            ) : (
+              disponibles.map(({ nombre: n }) => (
+                <button key={n} onClick={() => elegirNombre(n)} className={`${card} p-4 text-left flex items-center gap-3 hover:border-blue-200 transition-colors`}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm text-white shrink-0" style={{ background: A }}>
+                    {n.split(" ").map((x) => x[0]).join("").slice(0, 2)}
+                  </div>
+                  <p className="font-semibold text-slate-800">{n}</p>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
     );
   }
 
+  const slotsDisponibles = slotsDe(nombre);
+
   return (
     <div className="min-h-screen" style={{ background: BG, fontFamily: "Inter, sans-serif" }}>
       <style>{fontImport}</style>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-5 flex items-center gap-3">
-          <button onClick={() => (guardia ? setGuardia(null) : onBack())} className="p-2 -ml-2 rounded-lg hover:bg-slate-50 transition-colors">
+          <button onClick={volver} className="p-2 -ml-2 rounded-lg hover:bg-slate-50 transition-colors">
             <ArrowLeft size={20} className="text-slate-400" />
           </button>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: BG }}>
@@ -86,12 +129,33 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
         </div>
       </header>
       <main className="max-w-2xl mx-auto px-4 py-8">
-        {buscandoGuardia ? (
+        {!slot ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500 text-center mb-2">Tenés dos guardias asignadas hoy. ¿Cuál vas a hacer?</p>
+            {slotsDisponibles.map((s) => {
+              const a = asigHoy[`${HOY}:${nombre}:${s}`];
+              const label = SLOTS.find((x) => x.id === s)?.label ?? s;
+              if (!a) return null;
+              return (
+                <button key={s} onClick={() => setSlot(s)} className={`${card} p-4 w-full text-left flex items-center justify-between gap-3 hover:border-blue-200 transition-colors`}>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5">
+                      {a.base} · Móvil <span style={{ color: R }}>{a.movil}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">{a.turno}</p>
+                  </div>
+                  <ChevronRight size={18} className="text-slate-300 shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        ) : buscandoGuardia ? (
           <div className={`${card} p-6 text-center text-slate-400 text-sm`}>Cargando...</div>
         ) : !guardia ? (
-          <PMSeleccion nombreParamedico={nombre} onConfirmar={(g) => setGuardia(g)} />
+          <PMSeleccion nombreParamedico={nombre} slot={slot} onConfirmar={(g) => setGuardia(g)} />
         ) : (
-          <PMChecklist base={guardia.base} movilFisico={guardia.movilFisico} nombreParamedico={nombre} />
+          <PMChecklist base={guardia.base} movilFisico={guardia.movilFisico} nombreParamedico={nombre} slot={slot} />
         )}
       </main>
     </div>
