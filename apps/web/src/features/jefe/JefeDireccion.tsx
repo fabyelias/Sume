@@ -2,9 +2,10 @@ import { Asterisk, CheckCircle2, ChevronDown, Users, XCircle } from "lucide-reac
 import { useEffect, useState } from "react";
 import { KpiCard } from "../../components/shared/KpiCard";
 import { SecTitle } from "../../components/shared/SecTitle";
+import { HOY } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, G, card } from "../../lib/theme";
-import type { Asignaciones, Movil, Personal, Presencias } from "../../types";
+import type { ChecklistsPM, Movil, Personal, Presencias } from "../../types";
 
 function CheckR({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -17,14 +18,14 @@ function CheckR({ ok, label }: { ok: boolean; label: string }) {
 
 export function JefeDireccion() {
   const [expand, setExpand] = useState<string | null>(null);
-  const [asig, setAsig] = useState<Asignaciones>({});
+  const [checklists, setChecklists] = useState<ChecklistsPM>({});
   const [presencias, setPresencias] = useState<Presencias>({});
   const [moviles, setMoviles] = useState<Movil[]>([]);
   const [personal, setPersonal] = useState<Personal[]>([]);
 
   useEffect(() => {
     const load = async () => {
-      setAsig(await api.getAsignaciones());
+      setChecklists(await api.getChecklistsPM());
       setPresencias(await api.getPresencias());
     };
     const loadCatalogo = async () => {
@@ -39,9 +40,12 @@ export function JefeDireccion() {
 
   const MOVILES_MED = ["531", "530", "527", "Kangoo"];
 
+  // "Operativo" = el paramédico ya envió (no solo "se le asignó") el
+  // checklist de hoy para ese móvil, y si corresponde médico, que haya
+  // fichado presente hoy.
   const operativo = (movilId: string) => {
-    const pmOk = Object.values(asig).some((v) => v.movil === movilId);
-    const medOk = Object.values(presencias).some((v) => v.movil === movilId && v.confirmado);
+    const pmOk = Object.entries(checklists).some(([k, v]) => k.startsWith(`${HOY}:`) && v.movilFisico === movilId && v.enviado);
+    const medOk = Object.entries(presencias).some(([k, v]) => k.endsWith(`:${HOY}`) && v.movil === movilId && v.confirmado);
     return MOVILES_MED.includes(movilId) ? pmOk && medOk : pmOk;
   };
 

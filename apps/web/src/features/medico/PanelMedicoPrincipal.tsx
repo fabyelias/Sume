@@ -20,13 +20,18 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
       const k = `${medico.id}:${HOY}`;
       if (g[k]) setGuardia(g[k]);
 
-      const asig = await api.getAsignaciones();
+      // El checklist del paramédico se considera "confirmado" cuando algún
+      // paramédico envió (de verdad, no solo "se le asignó") el checklist
+      // de hoy para este móvil.
+      const checklists = await api.getChecklistsPM();
       const movilMedico = g[k]?.movilAsig || medico.movilFijo;
-      const pmOk = Object.values(asig).some((v) => v.movil === movilMedico);
+      const pmOk = Object.entries(checklists).some(([ck, v]) => ck.startsWith(`${HOY}:`) && v.movilFisico === movilMedico && v.enviado);
       setParamedicoOk(pmOk);
 
       const p = await api.getPresencias();
-      if (p[medico.id]) setPresencia(p[medico.id]);
+      const presKey = `${medico.id}:${HOY}`;
+      if (p[presKey]) setPresencia(p[presKey]);
+      else setPresencia(null);
 
       const pines = await api.getPines();
       if (pines[medico.id]) setPinMedico(pines[medico.id]);
@@ -76,7 +81,7 @@ export function PanelMedicoPrincipal({ medico, onBack }: { medico: Medico; onBac
     const datos: Presencia = { confirmado: true, hora, movil: movilHoy, tarde, minutosTarde };
     setPresencia(datos);
     const todas = await api.getPresencias();
-    todas[medico.id] = datos;
+    todas[`${medico.id}:${HOY}`] = datos;
     await api.setPresencias(todas);
 
     // La guardia pasa de "pendiente" a "presente" para que el Jefe vea el
