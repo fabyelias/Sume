@@ -1,35 +1,47 @@
 import { ArrowLeft, Asterisk, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { HOY, SLOTS, type Slot } from "../../data/constants";
+import { AYER, HOY, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, BG, R, card, fontImport } from "../../lib/theme";
-import type { Asignaciones, Base, Paramedico } from "../../types";
+import type { Asignaciones, Base, ChecklistsPM, Paramedico } from "../../types";
 import { PMChecklist } from "./PMChecklist";
 import { PMSeleccion } from "./PMSeleccion";
 
 type Guardia = { base: Base; movilFisico: string };
+type SlotInfo = { slot: Slot; fecha: string };
 
 export function PanelParamedico({ onBack }: { onBack: () => void }) {
   const [paramedicos, setParamedicos] = useState<Paramedico[]>([]);
   const [asigHoy, setAsigHoy] = useState<Asignaciones>({});
+  const [checklistsCache, setChecklistsCache] = useState<ChecklistsPM>({});
   const [cargandoLista, setCargandoLista] = useState(true);
   const [nombre, setNombre] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
+  const [slotFecha, setSlotFecha] = useState<string>(HOY);
   const [guardia, setGuardia] = useState<Guardia | null>(null);
   const [buscandoGuardia, setBuscandoGuardia] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.paramedicos(), api.getAsignaciones()]).then(([ps, a]) => {
+    Promise.all([api.paramedicos(), api.getAsignaciones(), api.getChecklistsPM()]).then(([ps, a, cls]) => {
       setParamedicos(ps);
       setAsigHoy(a);
+      setChecklistsCache(cls);
       setCargandoLista(false);
     });
   }, []);
 
-  const slotsDe = (n: string): Slot[] => SLOTS.map((s) => s.id).filter((s) => !!asigHoy[`${HOY}:${n}:${s}`]);
+  // Devuelve los slots activos del paramédico: los de hoy, más los de ayer
+  // que están abiertos (turno nocturno que cruza medianoche).
+  const slotsDe = (n: string): SlotInfo[] =>
+    SLOTS.map(({ id }): SlotInfo | null => {
+      if (asigHoy[`${HOY}:${n}:${id}`]) return { slot: id, fecha: HOY };
+      const ayerKey = `${AYER}:${n}:${id}`;
+      const cl = checklistsCache[ayerKey];
+      if (asigHoy[ayerKey] && cl?.enviado && !cl.firmado) return { slot: id, fecha: AYER };
+      return null;
+    }).filter(Boolean) as SlotInfo[];
 
-  // Si ya tiene un checklist enviado hoy para esa guardia puntual, salta
-  // directo a él en vez de hacerlo elegir base/móvil de nuevo.
+  // Si ya tiene un checklist enviado para esa guardia, salta directo a PMChecklist.
   useEffect(() => {
     if (!nombre || !slot) {
       setGuardia(null);
@@ -37,16 +49,23 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
     }
     setBuscandoGuardia(true);
     api.getChecklistsPM().then((checklists) => {
-      const rec = checklists[`${HOY}:${nombre}:${slot}`];
+      const rec = checklists[`${slotFecha}:${nombre}:${slot}`];
       setGuardia(rec ? { base: rec.base, movilFisico: rec.movilFisico } : null);
       setBuscandoGuardia(false);
     });
-  }, [nombre, slot]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nombre, slot, slotFecha]);
 
   const elegirNombre = (n: string) => {
     setNombre(n);
     const slots = slotsDe(n);
-    setSlot(slots.length === 1 ? slots[0] : null);
+    if (slots.length === 1) {
+      setSlot(slots[0].slot);
+      setSlotFecha(slots[0].fecha);
+    } else {
+      setSlot(null);
+      setSlotFecha(HOY);
+    }
   };
 
   const volver = () => {
@@ -56,10 +75,13 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
     }
     if (slot && slotsDe(nombre ?? "").length > 1) {
       setSlot(null);
+      setSlotFecha(HOY);
       return;
     }
     if (nombre) {
       setNombre(null);
+      setSlot(null);
+      setSlotFecha(HOY);
       return;
     }
     onBack();
@@ -132,14 +154,22 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
         {!slot ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-500 text-center mb-2">Tenés dos guardias asignadas hoy. ¿Cuál vas a hacer?</p>
-            {slotsDisponibles.map((s) => {
-              const a = asigHoy[`${HOY}:${nombre}:${s}`];
+            {slotsDisponibles.map(({ slot: s, fecha: f }) => {
+              const a = asigHoy[`${f}:${nombre}:${s}`];
               const label = SLOTS.find((x) => x.id === s)?.label ?? s;
               if (!a) return null;
+              const esAyer = f === AYER;
               return (
-                <button key={s} onClick={() => setSlot(s)} className={`${card} p-4 w-full text-left flex items-center justify-between gap-3 hover:border-blue-200 transition-colors`}>
+                <button
+                  key={s}
+                  onClick={() => { setSlot(s); setSlotFecha(f); }}
+                  className={`${card} p-4 w-full text-left flex items-center justify-between gap-3 hover:border-blue-200 transition-colors`}
+                >
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">{label}</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-semibold">
+                      {label}
+                      {esAyer && <span className="ml-2 text-amber-500">· En curso desde ayer</span>}
+                    </p>
                     <p className="text-sm font-semibold text-slate-800 mt-0.5">
                       {a.base} · Móvil <span style={{ color: R }}>{a.movil}</span>
                     </p>
@@ -155,7 +185,7 @@ export function PanelParamedico({ onBack }: { onBack: () => void }) {
         ) : !guardia ? (
           <PMSeleccion nombreParamedico={nombre} slot={slot} onConfirmar={(g) => setGuardia(g)} />
         ) : (
-          <PMChecklist base={guardia.base} movilFisico={guardia.movilFisico} nombreParamedico={nombre} slot={slot} />
+          <PMChecklist base={guardia.base} movilFisico={guardia.movilFisico} nombreParamedico={nombre} slot={slot} fecha={slotFecha} />
         )}
       </main>
     </div>

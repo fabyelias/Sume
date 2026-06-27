@@ -8,6 +8,10 @@
 const hoyDate = new Date();
 export const HOY = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth() + 1).padStart(2, "0")}-${String(hoyDate.getDate()).padStart(2, "0")}`;
 
+const ayerDate = new Date(hoyDate);
+ayerDate.setDate(ayerDate.getDate() - 1);
+export const AYER = `${ayerDate.getFullYear()}-${String(ayerDate.getMonth() + 1).padStart(2, "0")}-${String(ayerDate.getDate()).padStart(2, "0")}`;
+
 export const MOVILES_FIS = ["538", "537", "531", "533", "532", "535", "Kangoo", "Polo 1", "Polo 2"];
 export const MOVILES_MED = ["531", "530", "527", "Kangoo"];
 

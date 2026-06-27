@@ -21,6 +21,7 @@ import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
 import { calcularMinutosExtra, calcularMinutosTarde, formatMinutos } from "../../lib/turnos";
 import type { Base, CategoriaReporte, Reporte } from "../../types";
+
 import { ChecklistItemPM, type DetallePM } from "./ChecklistItemPM";
 
 const ITEM_KEYS = [
@@ -65,7 +66,7 @@ const CATEGORIA_ITEM: Record<ItemKey, CategoriaReporte> = {
 
 const ESTADO_REPORTE_LABEL: Record<string, string> = { abierto: "Pendiente", en_proceso: "En proceso", resuelto: "Resuelto" };
 
-export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { base: Base; movilFisico: string; nombreParamedico: string; slot: Slot }) {
+export function PMChecklist({ base, movilFisico, nombreParamedico, slot, fecha = HOY }: { base: Base; movilFisico: string; nombreParamedico: string; slot: Slot; fecha?: string }) {
   const [{ ok, detalle }, setState] = useState(buildInitialPM());
   const [oxigeno, setOxigeno] = useState({ centrales: 2, centralesOk: 2, manuales: 2, manualesOk: 2 });
   const [km, setKm] = useState("");
@@ -81,7 +82,7 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
   const [minutosTarde, setMinutosTarde] = useState(0);
   const [cargandoChecklist, setCargandoChecklist] = useState(true);
   const PIN_CORRECTO = "1234";
-  const checklistKey = `${HOY}:${nombreParamedico}:${slot}`;
+  const checklistKey = `${fecha}:${nombreParamedico}:${slot}`;
 
   // Si ya se envió el checklist hoy (quedó guardado), se carga bloqueado tal
   // cual quedó: no se vuelve a pedir, solo se pueden seguir cargando
