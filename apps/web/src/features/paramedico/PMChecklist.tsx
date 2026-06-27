@@ -19,6 +19,7 @@ import { SecTitle } from "../../components/shared/SecTitle";
 import { HOY, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, R, card, grad } from "../../lib/theme";
+import { calcularMinutosExtra, calcularMinutosTarde, formatMinutos } from "../../lib/turnos";
 import type { Base, CategoriaReporte, Reporte } from "../../types";
 import { ChecklistItemPM, type DetallePM } from "./ChecklistItemPM";
 
@@ -76,6 +77,8 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
   const [pin, setPin] = useState("");
   const [firmado, setFirmado] = useState(false);
   const [horaCierre, setHoraCierre] = useState<string | null>(null);
+  const [horaIngreso, setHoraIngreso] = useState<string | null>(null);
+  const [minutosTarde, setMinutosTarde] = useState(0);
   const [cargandoChecklist, setCargandoChecklist] = useState(true);
   const PIN_CORRECTO = "1234";
   const checklistKey = `${HOY}:${nombreParamedico}:${slot}`;
@@ -93,6 +96,8 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
         setEnviado(rec.enviado);
         setFirmado(rec.firmado);
         setHoraCierre(rec.horaCierre);
+        setHoraIngreso(rec.horaIngreso ?? null);
+        setMinutosTarde(rec.minutosTarde ?? 0);
       }
       setCargandoChecklist(false);
     });
@@ -146,18 +151,22 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
 
   const confirmarGuardia = async () => {
     if (!puedeEnviar) return;
+    const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    const tarde = calcularMinutosTarde(base.turno, hora);
     setEnviado(true);
-    // Cada ítem marcado con falla se reporta de una: lo ven en vivo el Jefe
-    // (tab Mecánica) y el Mecánico (tab Reportes), que pueden responder.
+    setHoraIngreso(hora);
+    setMinutosTarde(tarde);
     await Promise.all(
       ITEM_KEYS.filter((k) => !ok[k]).map((k) =>
         api.crearReporte({ movilId: movilFisico, categoria: CATEGORIA_ITEM[k], texto: detalle[k].texto, foto: detalle[k].foto, autor: nombreParamedico }),
       ),
     );
-    // Queda guardado y bloqueado: si vuelve a entrar más tarde durante la
-    // misma guardia, lo encuentra tal cual lo dejó.
     const checklists = await api.getChecklistsPM();
-    checklists[checklistKey] = { base, movilFisico, ok, detalle, oxigeno, km, enviado: true, firmado: false, horaCierre: null };
+    checklists[checklistKey] = {
+      base, movilFisico, ok, detalle, oxigeno, km, enviado: true,
+      horaIngreso: hora, ...(tarde > 0 && { minutosTarde: tarde }),
+      firmado: false, horaCierre: null,
+    };
     await api.setChecklistsPM(checklists);
   };
 
@@ -173,10 +182,11 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
   const confirmarCierre = async () => {
     if (pin !== PIN_CORRECTO) return;
     const hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    const minutosExtra = calcularMinutosExtra(base.turno, hora);
     setFirmado(true);
     setHoraCierre(hora);
     const cierresActuales = await api.getCierres();
-    cierresActuales[checklistKey] = { firmado: true, hora, movil: movilFisico, base: base.label, km, novedades: reportes.length };
+    cierresActuales[checklistKey] = { firmado: true, hora, movil: movilFisico, base: base.label, km, novedades: reportes.length, ...(minutosExtra > 0 && { minutosExtra }) };
     await api.setCierres(cierresActuales);
 
     const checklists = await api.getChecklistsPM();
@@ -264,8 +274,21 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
         style={!enviado && puedeEnviar ? { background: grad } : {}}
       >
         {enviado ? <Lock size={16} /> : <Send size={16} />}
-        {enviado ? `✓ Guardia confirmada · ${base.label} · Móvil ${movilFisico}` : puedeEnviar ? "Confirmar toma de guardia" : "Faltan datos"}
+        {enviado
+          ? `✓ Guardia confirmada · ${base.label} · Móvil ${movilFisico}${horaIngreso ? ` · Ingreso ${horaIngreso}` : ""}`
+          : puedeEnviar ? "Confirmar toma de guardia" : "Faltan datos"}
       </button>
+
+      {enviado && minutosTarde > 0 && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
+            Llegada tarde: {formatMinutos(minutosTarde)}
+          </p>
+          <p className="text-[11px] text-amber-500 mt-0.5">
+            El turno comenzaba a las {base.turno.match(/^\d{1,2}:\d{2}/)?.[0]}
+          </p>
+        </div>
+      )}
 
       {enviado && (
         <section className="space-y-3">
@@ -406,19 +429,32 @@ export function PMChecklist({ base, movilFisico, nombreParamedico, slot }: { bas
         </section>
       )}
 
-      {firmado && (
-        <div className={`${card} p-5 border-l-4 border-emerald-400`}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-full bg-emerald-50">
-              <CheckCircle2 size={20} className="text-emerald-500" />
+      {firmado && (() => {
+        const minExtra = horaCierre ? calcularMinutosExtra(base.turno, horaCierre) : 0;
+        return (
+          <div className={`${card} p-5 border-l-4 border-emerald-400`}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-full bg-emerald-50">
+                <CheckCircle2 size={20} className="text-emerald-500" />
+              </div>
+              <div>
+                <p className="font-display text-lg text-slate-800">Guardia cerrada y firmada</p>
+                <p className="text-xs text-slate-400">Registrado a las {horaCierre} · visible en panel del Jefe</p>
+              </div>
             </div>
-            <div>
-              <p className="font-display text-lg text-slate-800">Guardia cerrada y firmada</p>
-              <p className="text-xs text-slate-400">Registrado a las {horaCierre} · visible en panel del Jefe</p>
-            </div>
+            {minExtra > 0 && (
+              <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
+                  Horas extra: {formatMinutos(minExtra)}
+                </p>
+                <p className="text-[11px] text-amber-500 mt-0.5">
+                  El turno finalizaba a las {base.turno.match(/[^–\-]+$/)?.[0]?.trim()}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { SecTitle } from "../../components/shared/SecTitle";
 import { HOY, MOVILES_FIS, SLOTS, type Slot } from "../../data/constants";
 import { api } from "../../lib/api";
 import { A, G, R, card, grad } from "../../lib/theme";
-import type { Asignaciones, Base, Cierres, Francos, Medico, Paramedico } from "../../types";
+import { formatMinutos } from "../../lib/turnos";
+import type { Asignaciones, Base, ChecklistsPM, Cierres, Francos, Medico, Paramedico } from "../../types";
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
@@ -18,6 +19,7 @@ export function JefeAsignacion() {
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [asig, setAsig] = useState<Asignaciones>({});
   const [cierres, setCierres] = useState<Cierres>({});
+  const [checklists, setChecklists] = useState<ChecklistsPM>({});
   const [editando, setEditando] = useState<{ nombre: string; slot: Slot } | null>(null);
   const [form, setForm] = useState({ base: "", movil: "", medico: "" });
   const semIni = new Date(2026, 5, 15);
@@ -33,6 +35,7 @@ export function JefeAsignacion() {
       setAsig(await api.getAsignaciones());
       setCierres(await api.getCierres());
       setFrancos(await api.getFrancos());
+      setChecklists(await api.getChecklistsPM());
     };
     const loadCatalogo = async () => {
       setParamedicos(await api.paramedicos());
@@ -189,6 +192,7 @@ export function JefeAsignacion() {
                   if (id === "2" && !slot1) return null;
                   const a = asig[keyHoy(nombre, id)];
                   const cierre = cierres[keyHoy(nombre, id)];
+                  const checklist = checklists[keyHoy(nombre, id)];
                   const editMe = editando?.nombre === nombre && editando?.slot === id;
                   if (!a && !editMe) {
                     return (
@@ -225,14 +229,21 @@ export function JefeAsignacion() {
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {cierre?.firmado && (
-                            <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1">
-                              <CheckCircle2 size={11} />
-                              Firmado {cierre.hora}
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          {checklist?.horaIngreso && !cierre?.firmado && (
+                            <span className={`text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border flex items-center gap-1 ${checklist.minutosTarde ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                              Ingresó {checklist.horaIngreso}
+                              {checklist.minutosTarde ? ` · ${formatMinutos(checklist.minutosTarde)} tarde` : ""}
                             </span>
                           )}
-                          {!cierre?.firmado && a && <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200">En curso</span>}
+                          {cierre?.firmado && (
+                            <span className={`text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border flex items-center gap-1 ${cierre.minutosExtra ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                              <CheckCircle2 size={11} />
+                              Firmado {cierre.hora}
+                              {cierre.minutosExtra ? ` · +${formatMinutos(cierre.minutosExtra)} extra` : ""}
+                            </span>
+                          )}
+                          {!cierre?.firmado && a && !checklist?.horaIngreso && <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200">En curso</span>}
                           <button
                             onClick={() => {
                               setEditando({ nombre, slot: id });

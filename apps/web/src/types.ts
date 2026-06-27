@@ -42,7 +42,7 @@ export type Movil = {
 export type Asignacion = { base: string; baseId: string; movil: string; turno: string; medico?: string };
 export type Asignaciones = Record<string, Asignacion>;
 
-export type Cierre = { firmado: boolean; hora: string; movil: string; base: string; km: string; novedades: number };
+export type Cierre = { firmado: boolean; hora: string; movil: string; base: string; km: string; novedades: number; minutosExtra?: number };
 export type Cierres = Record<string, Cierre>;
 
 // Franco (día libre) explícito, separado de Asignaciones: clave
@@ -77,6 +77,8 @@ export type ChecklistPM = {
   oxigeno: { centrales: number; centralesOk: number; manuales: number; manualesOk: number };
   km: string;
   enviado: boolean;
+  horaIngreso?: string;
+  minutosTarde?: number;
   firmado: boolean;
   horaCierre: string | null;
 };
